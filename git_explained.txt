@@ -16,5 +16,5 @@
 	git push origin nom_de_la_branche
 (votre branche apparait ensuite en ligne)
 
-6 – si vous voulez fusionner les codes (vous avez fini votre truc et ca marche) en ligne sur github, faites compare and pull request, je validerai ensuite. 
+6 – si vous voulez fusionner les codes (vous avez fini votre truc et ca marche) en ligne sur github, faites compare and pull request request ( !!! attention bien le mettre dans le repo nono9212 et pas dans unsupervised ai !!! ) , je validerai ensuite. 
  Les autres à ce moment là il faudra se mettre à jour si vous ne travaillez sur rien de spécial.
