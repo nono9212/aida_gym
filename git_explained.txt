@@ -1,0 +1,20 @@
+1 – Installation du code sur la machine des salles infos
+
+-	Création d’un compte sur github 
+-	Installer le code sur votre machine : dans un nouveau dossier aida taper : « git clone url « (avec la bonne url bien sur)
+
+2 – Se mettre à jour (à faire dès que quelqu’un a fait un changement) : git pull origin master
+
+3 – ajouter une fonctionnalité : créer une branche : git checkout -b nom_de_la_branche
+ (pour se placer dans cette branche après sans la recreer enlever le -b)
+ 
+4 – Faites vos modifs
+
+5 – Envoyez les en ligne :
+	git add .
+	git commit -m « description de vos modifs »
+	git push origin nom_de_la_branche
+(votre branche apparait ensuite en ligne)
+
+6 – si vous voulez fusionner les codes (vous avez fini votre truc et ca marche) en ligne sur github, faites compare and pull request, je validerai ensuite. 
+ Les autres à ce moment là il faudra se mettre à jour si vous ne travaillez sur rien de spécial.
