@@ -15,6 +15,7 @@ if __name__ == '__main__':
 
 	workDirectory = "."
 	
+	print("okok")
 
 	parser = argparse.ArgumentParser(description='Aida traning script')
 
@@ -169,9 +170,9 @@ if __name__ == '__main__':
 		if normalize:
 			env.save_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 		model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)
-		
+	
 		print("\n saved at "+str((i+1)*args.save_every))
-		
+	model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)	
 	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 											  render  = False, 
 											  on_rack = False,
