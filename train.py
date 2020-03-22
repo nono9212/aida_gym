@@ -179,6 +179,8 @@ if __name__ == '__main__':
 	
 		print("\n saved at "+str((i+1)*args.save_every))
 	model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)	
+	if normalize:
+		env.save_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 											  render  = False, 
 											  on_rack = False,
@@ -191,7 +193,7 @@ if __name__ == '__main__':
 											  )
 					])
 	if normalize:
-		env = VecNormalize(env)
+		env = VecNormalize(env, training = False)
 		env.load_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 
 	images = []
