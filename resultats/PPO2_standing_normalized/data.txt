@@ -1,0 +1,27 @@
+{
+    "cliprange": 0.2,
+    "cliprange_vf": null,
+    "default_reward": 2.0,
+    "direction_weight": 0.0,
+    "ent_coef": 0.01,
+    "gamma": 0.99,
+    "height_weight": 10.0,
+    "lam": 0.95,
+    "layers": [
+        100,
+        100
+    ],
+    "learning_rate": 0.001,
+    "max_grad_norm": 0.5,
+    "n_steps": 256,
+    "name": "PPO2_standing_normalized",
+    "nminibatches": 4,
+    "noptepochs": 4,
+    "normalize": true,
+    "orientation_weight": 0.0,
+    "resume_from": null,
+    "save_every": 500000,
+    "speed_weight": 0.0,
+    "total_steps": 5000000,
+    "vf_coef": 0.5
+}
