@@ -127,7 +127,7 @@ if __name__ == '__main__':
 						for i in range(2)])
 	
 	if normalize:
-		env = VecNormalize(env)
+		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)
 
 
 	model = PPO2(MlpPolicy, 
