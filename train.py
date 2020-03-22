@@ -193,7 +193,7 @@ if __name__ == '__main__':
 											  )
 					])
 	if normalize:
-		env = VecNormalize(env, training = False)
+		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma, training = False)
 		env.load_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 
 	images = []
