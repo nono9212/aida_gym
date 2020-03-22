@@ -10,6 +10,8 @@ import argparse
 import imageio
 import time
 import os
+import json
+
 
 if __name__ == '__main__':
 
@@ -104,6 +106,10 @@ if __name__ == '__main__':
 		os.mkdir(workDirectory+"/log")
 	except FileExistsError:
 		print("Directory already exists")
+		
+		
+	with open(workDirectory+"/resultats/"+model_name+'/data.txt', 'w') as outfile:
+		json.dump(args, outfile,sort_keys=True,indent=4)
 	
 	commands = [[1,0]]
 	for i in range(5):
