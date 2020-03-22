@@ -109,7 +109,7 @@ if __name__ == '__main__':
 		
 		
 	with open(workDirectory+"/resultats/"+model_name+'/data.txt', 'w') as outfile:
-		json.dump(args, outfile,sort_keys=True,indent=4)
+		json.dump(vars(args), outfile,sort_keys=True,indent=4)
 	
 	commands = [[1,0]]
 	for i in range(5):
