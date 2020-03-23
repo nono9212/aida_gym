@@ -111,7 +111,7 @@ if __name__ == '__main__':
 	with open(workDirectory+"/resultats/"+model_name+'/data.txt', 'w') as outfile:
 		json.dump(vars(args), outfile,sort_keys=True,indent=4)
 	
-	commands = [[1,0]]
+	commands = [[1,0],[2,0],[3,0]]
 	for i in range(5):
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
 		

@@ -228,6 +228,10 @@ class AidaBulletEnv(gym.Env):
           self.aida.ApplyAction(-0.5 * np.ones(12))
         self._pybullet_client.stepSimulation()
     ret = self._noisy_observation()
+	
+    for i in range(50):
+        self._step([0,-1,0,  0,1,0,  0,-1,0,  0,-1,0])  # init
+		
     return ret
 
   def _seed(self, seed=None):
@@ -362,7 +366,7 @@ class AidaBulletEnv(gym.Env):
             self.drawTarget(self.aida._targetPoint)
 
 
-    height_reward = (0.6-current_base_position[2])**2
+    height_reward = np.exp(-((current_base_position[2]-0.6)**2)/0.05)
     
     orientation = self.aida.GetBaseOrientation()
     rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
@@ -377,7 +381,7 @@ class AidaBulletEnv(gym.Env):
 	
     speed_reward = np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo)
 
-    return self._default_reward - self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
+    return self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
 
 
   def get_objectives(self):
