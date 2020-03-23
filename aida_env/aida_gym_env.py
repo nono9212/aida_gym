@@ -371,13 +371,13 @@ class AidaBulletEnv(gym.Env):
     orientation = self.aida.GetBaseOrientation()
     rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
     local_up = rot_mat[6:]
-    orientation_reward = (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-0.85)/0.15
+    orientation_reward = np.exp(-((np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-1)**2)/0.05)
     
     dirTo = distToTarget 
     dirTo /= np.linalg.norm(dirTo)
     actualDir = rot_mat[:2]
     actualDir /= np.linalg.norm(actualDir)
-    direction_reward = np.dot(actualDir, dirTo)
+    direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.05)
 	
     speed_reward = np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo)
 
