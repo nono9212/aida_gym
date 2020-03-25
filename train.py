@@ -124,7 +124,7 @@ if __name__ == '__main__':
 												  direction_weight   = args.direction_weight,
 												  speed_weight       = args.speed_weight
 												  )
-						for i in range(2)])
+						for i in range(32)])
 	
 	if normalize:
 		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)

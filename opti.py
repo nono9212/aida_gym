@@ -1,0 +1,289 @@
+from copy import deepcopy
+
+import numpy as np
+import optuna
+from optuna.pruners import SuccessiveHalvingPruner, MedianPruner
+from optuna.samplers import RandomSampler, TPESampler
+from optuna.integration.skopt import SkoptSampler
+from stable_baselines import SAC, DDPG, TD3
+from stable_baselines.ddpg import AdaptiveParamNoiseSpec, NormalActionNoise, OrnsteinUhlenbeckActionNoise
+
+from stable_baselines.common.base_class import _UnvecWrapper
+import gym
+
+import tensorflow as tf
+from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
+from stable_baselines import PPO2
+import aida_env.aida_gym_env as e
+import pybullet as p
+
+
+import time
+import os
+
+
+
+def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=None,
+                            n_jobs=1, sampler_method='random', pruner_method='halving',
+                            seed=0, verbose=1):
+    """
+    :param algo: (str)
+    :param model_fn: (func) function that is used to instantiate the model
+    :param env_fn: (func) function that is used to instantiate the env
+    :param n_trials: (int) maximum number of trials for finding the best hyperparams
+    :param n_timesteps: (int) maximum number of timesteps per trial
+    :param hyperparams: (dict)
+    :param n_jobs: (int) number of parallel jobs
+    :param sampler_method: (str)
+    :param pruner_method: (str)
+    :param seed: (int)
+    :param verbose: (int)
+    :return: (pd.Dataframe) detailed result of the optimization
+    """
+    # TODO: eval each hyperparams several times to account for noisy evaluation
+    # TODO: take into account the normalization (also for the test env -> sync obs_rms)
+    if hyperparams is None:
+        hyperparams = {}
+
+    # test during 3000 steps
+    n_test_steps = 1500
+    # evaluate every 20th of the maximum budget per iteration
+    n_evaluations = 40
+    evaluate_interval = int(n_timesteps / n_evaluations)
+
+    # n_warmup_steps: Disable pruner until the trial reaches the given number of step.
+
+
+
+    #sampler = RandomSampler(seed=seed)
+
+    #sampler = TPESampler(n_startup_trials=5, seed=seed)
+
+    sampler = SkoptSampler(skopt_kwargs={'base_estimator': "GP", 'acq_func': 'gp_hedge'})
+
+
+    #pruner = SuccessiveHalvingPruner(min_resource=1, reduction_factor=4, min_early_stopping_rate=0)
+
+    pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
+
+
+    study = optuna.create_study(study_name="optimisation_PPO2" sampler = sampler , pruner=pruner, storage='sqlite:///optimization.db',load_if_exists=True)
+
+
+    def objective(trial):
+
+        kwargs = hyperparams.copy()
+
+        trial.model_class = None
+
+        kwargs.update(sample_ppo2_params(trial))
+
+        def callback(_locals, _globals):
+            """
+            Callback for monitoring learning progress.
+            :param _locals: (dict)
+            :param _globals: (dict)
+            :return: (bool) If False: stop training
+            """
+            self_ = _locals['self']
+            trial = self_.trial
+
+            # Initialize variables
+            if not hasattr(self_, 'is_pruned'):
+                self_.is_pruned = False
+                self_.last_mean_test_reward = -np.inf
+                self_.last_time_evaluated = 0
+                self_.eval_idx = 0
+
+            if (self_.num_timesteps - self_.last_time_evaluated) < evaluate_interval:
+                return True
+
+            self_.last_time_evaluated = self_.num_timesteps
+
+            # Evaluate the trained agent on the test env
+            rewards = []
+            n_steps_done, reward_sum = 0, 0.0
+
+            # Sync the obs rms if using vecnormalize
+            # NOTE: this does not cover all the possible cases
+            if isinstance(self_.test_env, VecNormalize):
+                self_.test_env.obs_rms = deepcopy(self_.env.obs_rms)
+                self_.test_env.ret_rms = deepcopy(self_.env.ret_rms)
+                # Do not normalize reward
+                self_.test_env.norm_reward = False
+
+            obs = self_.test_env.reset()
+            while n_steps_done < n_test_steps:
+                # Use default value for deterministic
+                action, _ = self_.predict(obs)
+                obs, reward, done, _ = self_.test_env.step(action)
+                reward_sum += reward
+                n_steps_done += 1
+
+                if done:
+                    rewards.append(reward_sum)
+                    reward_sum = 0.0
+                    obs = self_.test_env.reset()
+            rewards.append(reward_sum)
+            mean_reward = np.mean(rewards)
+            summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
+            _locals['writer'].add_summary(summary, self_.num_timesteps)
+            self_.last_mean_test_reward = mean_reward
+            self_.eval_idx += 1
+
+            # report best or report current ?
+            # report num_timesteps or elasped time ?
+            trial.report(-1 * mean_reward, self_.eval_idx)
+            # Prune trial if need
+            if trial.should_prune(self_.eval_idx):
+                self_.is_pruned = True
+                return False
+
+            return True
+        commands = [[1,0],[2,0],[3,0]]
+        env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
+                                                  render  = False, 
+                                                  on_rack = False,
+                                                  default_reward     = 2,
+                                                  height_weight      = 5,
+                                                  orientation_weight = 3,
+                                                  direction_weight   = 2,
+                                                  speed_weight       = 2
+                                                  )
+                        for i in range(32)])
+        if(kwargs['normalize']):
+            env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=kwargs['gamma'])
+
+        model = PPO2(MlpPolicy, 
+                 env, 
+                 vf_coef         = 0.5,
+                 max_grad_norm   = 0.5,
+                 cliprange_vf    = -1,
+                 verbose         = 0,
+                 n_steps = kwargs['n_steps'],
+                 nminibatches = kwargs['nminibatches'],
+                 gamma = kwargs['gamma'],
+                 learning_rate = kwargs['learning_rate'],
+                 ent_coef = kwargs['ent_coef'],
+                 cliprange = kwargs['cliprange'],
+                 noptepochs = kwargs['noptepochs'],
+                 lam = kwargs['lam'],
+                 policy_kwargs   = dict(layers=[100,100]),
+                 tensorboard_log = "./optimisation/logOPTI"
+               )
+        model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+                                                  render  = False, 
+                                                  on_rack = False,
+                                                  default_reward     = 2,
+                                                  height_weight      = 5,
+                                                  orientation_weight = 3,
+                                                  direction_weight   = 2,
+                                                  speed_weight       = 2
+                                                  )
+                        ])
+        if(kwargs['normalize']):
+            model.test_env = VecNormalize(model.test_env, clip_obs=1000.0, clip_reward=1000.0, gamma=kwargs['gamma'],training=False, norm_reward=False)
+
+        model.trial = trial
+       
+        try:
+            model.learn(n_timesteps, callback=callback)
+            # Free memory
+            model.env.close()
+            model.test_env.close()
+        except AssertionError:
+            # Sometimes, random hyperparams can generate NaN
+            # Free memory
+            model.env.close()
+            model.test_env.close()
+            raise
+        is_pruned = False
+        cost = np.inf
+        if hasattr(model, 'is_pruned'):
+            is_pruned = model.is_pruned
+            cost = -1 * model.last_mean_test_reward
+        try:
+            os.mkdir("./optimisation/resultats/"+str(trial.number))
+        except FileExistsError:
+            print("Directory already exists")
+            
+        if kwargs['normalize']:
+            try:
+                os.mkdir("./optimisation/resultats/"+str(trial.number)+"/normalizeData")
+            except FileExistsError:
+                print("Directory already exists")
+
+        model.save("./optimisation/resultats/"+str(trial.number)+"/"+str(trial.number))    
+        if kwargs['normalize']:
+            model.env.save_running_average("./optimisation/resultats/"+str(trial.number) +"/normalizeData")
+        
+
+        del model.env, model.test_env
+        del model
+
+        if is_pruned:
+            try:
+                # Optuna >= 0.19.0
+                raise optuna.exceptions.TrialPruned()
+            except AttributeError:
+                raise optuna.structs.TrialPruned()
+
+        return cost
+
+    try:
+        study.optimize(objective, n_trials=n_trials, n_jobs=n_jobs)
+    except KeyboardInterrupt:
+        pass
+
+    print('Number of finished trials: ', len(study.trials))
+
+    print('Best trial:')
+    trial = study.best_trial
+
+    print('Value: ', trial.value)
+
+    print('Params: ')
+    for key, value in trial.params.items():
+        print('    {}: {}'.format(key, value))
+
+    return study.trials_dataframe()
+
+
+def sample_ppo2_params(trial):
+    """
+    Sampler for PPO2 hyperparams.
+    :param trial: (optuna.trial)
+    :return: (dict)
+    """
+    batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
+    n_steps = trial.suggest_categorical('n_steps', [16, 32, 64, 128, 256, 512, 1024, 2048])
+    gamma = trial.suggest_categorical('gamma', [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
+    learning_rate = trial.suggest_loguniform('lr', 1e-5, 1)
+    ent_coef = trial.suggest_loguniform('ent_coef', 0.00000001, 0.1)
+    cliprange = trial.suggest_categorical('cliprange', [0.1, 0.2, 0.3, 0.4])
+    noptepochs = trial.suggest_categorical('noptepochs', [1, 5, 10, 20, 30, 50])
+    lam = trial.suggest_categorical('lamdba', [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
+    normalize = trial.suggest_categorical('normalize', [True, False])
+
+    if n_steps < batch_size:
+        nminibatches = 1
+    else:
+        nminibatches = int(n_steps / batch_size)
+
+    return {
+        'n_steps': n_steps,
+        'nminibatches': nminibatches,
+        'gamma': gamma,
+        'learning_rate': learning_rate,
+        'ent_coef': ent_coef,
+        'cliprange': cliprange,
+        'noptepochs': noptepochs,
+        'lam': lam,
+        'layers':[100,100],
+        'normalize':normalize
+    }
+
+
+if __name__ == '__main__':
+    hyperparam_optimization()
