@@ -141,7 +141,7 @@ class AidaBulletEnv(gym.Env):
     self._direction_weight = direction_weight
     self._speed_weight = speed_weight
 
-    print("urdf_root=" + self._urdf_root)
+
     #self._env_randomizer = env_randomizer
     # PD control needs smaller time step for stability.
     if pd_control_enabled or accurate_motor_model_enabled:
@@ -191,8 +191,7 @@ class AidaBulletEnv(gym.Env):
           numSolverIterations=int(self._num_bullet_solver_iterations))
       self._pybullet_client.setTimeStep(self._time_step)
       path = aida.getDataPath() + "/urdf/" + self._area +".urdf"
-      print(path)
-      print("%s/" % self._urdf_root + self._area +".urdf" )
+
       self._pybullet_client.loadURDF(path)
       #self._pybullet_client.loadURDF("%s/plane.urdf" % self._urdf_root)
 
@@ -362,8 +361,8 @@ class AidaBulletEnv(gym.Env):
     distToTarget = np.array(list(current_base_position[0:2])) - np.array(self._commands[self._currentObjective])
     if(np.linalg.norm(distToTarget) < 0.4):
         self._currentObjective = (self._currentObjective+1)%len(self._commands)
-        if(self._is_render):
-            self.drawTarget(self.aida._targetPoint)
+        #if(self._is_render):
+            #self.drawTarget(self.aida._targetPoint)
 
 
     height_reward = np.exp(-((current_base_position[2]-0.6)**2)/0.05)
