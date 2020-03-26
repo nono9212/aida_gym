@@ -159,10 +159,10 @@ class AidaBulletEnv(gym.Env):
     self.reset()
     observation_high = (
         self.aida.GetObservationUpperBound() + OBSERVATION_EPS)
-    observation_high = np.concatenate((observation_high,np.array([100,100])),axis=None)
+    observation_high = np.concatenate((observation_high,np.array([10,10])),axis=None)
     observation_low = (
         self.aida.GetObservationLowerBound() - OBSERVATION_EPS)
-    observation_low = np.concatenate((observation_low,np.array([-100,-100])),axis=None)
+    observation_low = np.concatenate((observation_low,np.array([-10,-10])),axis=None)
     action_dim = NUM_MOTORS
     action_high = np.array([self._action_bound] * action_dim)
     self.action_space = spaces.Box(-action_high, action_high)

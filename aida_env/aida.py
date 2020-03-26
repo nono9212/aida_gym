@@ -26,7 +26,7 @@ LEGS_TO_MOTOR_NAMES = [
     ['left_rear_calf_hinge', 'left_rear_thigh_hinge', 'left_rear_shoulder_hinge']]
 LIMITS_CALFS = (math.degrees(0.2), math.degrees(2.2))
 LIMITS_THIGH = (math.degrees(-0.8), math.degrees(1.0))
-LIMITS_SHOULDER = (math.degrees(-0.6), math.degrees(0.2))
+LIMITS_SHOULDER = (math.degrees(-0.2), math.degrees(0.6))
 
 LIMITS_MINS = np.array([LIMITS_CALFS[0], LIMITS_THIGH[0], LIMITS_SHOULDER[0]])
 LIMITS_MAX = np.array([LIMITS_CALFS[1], LIMITS_THIGH[1], LIMITS_SHOULDER[1]])
@@ -291,6 +291,7 @@ class Aida:
         upper_bound[2 * self.num_motors:3 * self.num_motors] = 1.0
         upper_bound[3 * self.num_motors:] = 1.0  
         upper_bound[-3 :] = 100.0
+        upper_bound[-1] = 1
         return upper_bound
 
     def GetObservationLowerBound(self):
@@ -301,6 +302,7 @@ class Aida:
         upper_bound[2 * self.num_motors:3 * self.num_motors] = -1.0
         upper_bound[3 * self.num_motors:] = 0  
         upper_bound[-3 :] = -100.0
+        upper_bound[-1] = 0
         return upper_bound
 
     def GetObservationDimension(self):
