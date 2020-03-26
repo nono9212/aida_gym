@@ -17,7 +17,7 @@ if __name__ == '__main__':
 
 	workDirectory = "."
 	
-	print("okok")
+
 
 	parser = argparse.ArgumentParser(description='Aida traning script')
 
@@ -115,8 +115,8 @@ if __name__ == '__main__':
 	for i in range(5):
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
 		
-	env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
-												  render  = False, 
+	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+												  render  = True, 
 												  on_rack = False,
 												  default_reward     = args.default_reward,
 												  height_weight      = args.height_weight,
@@ -124,7 +124,7 @@ if __name__ == '__main__':
 												  direction_weight   = args.direction_weight,
 												  speed_weight       = args.speed_weight
 												  )
-						for i in range(32)])
+						for i in range(1)])
 	
 	if normalize:
 		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)

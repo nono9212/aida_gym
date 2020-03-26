@@ -141,7 +141,7 @@ class AidaBulletEnv(gym.Env):
     self._direction_weight = direction_weight
     self._speed_weight = speed_weight
 
-    print("urdf_root=" + self._urdf_root)
+
     #self._env_randomizer = env_randomizer
     # PD control needs smaller time step for stability.
     if pd_control_enabled or accurate_motor_model_enabled:
@@ -159,10 +159,10 @@ class AidaBulletEnv(gym.Env):
     self.reset()
     observation_high = (
         self.aida.GetObservationUpperBound() + OBSERVATION_EPS)
-    observation_high = np.concatenate((observation_high,np.array([100,100])),axis=None)
+    observation_high = np.concatenate((observation_high,np.array([10,10])),axis=None)
     observation_low = (
         self.aida.GetObservationLowerBound() - OBSERVATION_EPS)
-    observation_low = np.concatenate((observation_low,np.array([-100,-100])),axis=None)
+    observation_low = np.concatenate((observation_low,np.array([-10,-10])),axis=None)
     action_dim = NUM_MOTORS
     action_high = np.array([self._action_bound] * action_dim)
     self.action_space = spaces.Box(-action_high, action_high)
@@ -191,8 +191,7 @@ class AidaBulletEnv(gym.Env):
           numSolverIterations=int(self._num_bullet_solver_iterations))
       self._pybullet_client.setTimeStep(self._time_step)
       path = aida.getDataPath() + "/urdf/" + self._area +".urdf"
-      print(path)
-      print("%s/" % self._urdf_root + self._area +".urdf" )
+
       self._pybullet_client.loadURDF(path)
       #self._pybullet_client.loadURDF("%s/plane.urdf" % self._urdf_root)
 
@@ -230,7 +229,7 @@ class AidaBulletEnv(gym.Env):
     ret = self._noisy_observation()
 	
     for i in range(50):
-        self._step([0,-1,0,  0,1,0,  0,-1,0,  0,-1,0])  # init
+        self._step([-1,-1,1,  0,0,1,  -1,-1,1,  0,0,1])  # init
 		
     return ret
 
@@ -362,8 +361,8 @@ class AidaBulletEnv(gym.Env):
     distToTarget = np.array(list(current_base_position[0:2])) - np.array(self._commands[self._currentObjective])
     if(np.linalg.norm(distToTarget) < 0.4):
         self._currentObjective = (self._currentObjective+1)%len(self._commands)
-        if(self._is_render):
-            self.drawTarget(self.aida._targetPoint)
+        #if(self._is_render):
+            #self.drawTarget(self.aida._targetPoint)
 
 
     height_reward = np.exp(-((current_base_position[2]-0.6)**2)/0.05)
@@ -379,10 +378,12 @@ class AidaBulletEnv(gym.Env):
     actualDir /= np.linalg.norm(actualDir)
     direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.05)
 	
-    speed_reward = np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo)
+    speed_reward = 1-np.exp(-np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo))
 
-    return self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
 
+    reward = self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
+
+    return reward/(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
 
   def get_objectives(self):
     return self._objectives
