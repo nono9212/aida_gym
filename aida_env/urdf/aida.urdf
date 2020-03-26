@@ -1072,7 +1072,10 @@
     </plugin>
   </gazebo>
   <link name="base_link">
-
+  <inertial>
+      <mass value="10"/>
+      <inertia ixx="0.0" ixy="0.0" ixz="0.0" iyy="0.0" iyz="0.0" izz="0.0"/>
+    </inertial>
 	</link>
   <joint name="base_joint" type="fixed">
     <parent link="base_link"/>
