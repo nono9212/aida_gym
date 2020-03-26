@@ -230,7 +230,7 @@ class AidaBulletEnv(gym.Env):
     ret = self._noisy_observation()
 	
     for i in range(50):
-        self._step([0,-1,0,  0,1,0,  0,-1,0,  0,-1,0])  # init
+        self._step([-1,-1,1,  0,0,1,  -1,-1,1,  0,0,1])  # init
 		
     return ret
 
