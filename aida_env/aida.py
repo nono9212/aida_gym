@@ -123,7 +123,7 @@ class Aida:
             self._kp = 1.0
             self._kd = 1.0
         self.time_step = time_step
-        print (self._kp, self._kd)
+
         self.Reset()
   
 
