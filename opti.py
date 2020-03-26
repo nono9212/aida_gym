@@ -68,7 +68,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
     pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
 
 
-    study = optuna.create_study(study_name="optimisation_PPO2" sampler = sampler , pruner=pruner, storage='sqlite:///optimization.db',load_if_exists=True)
+    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimization.db',load_if_exists=True)
 
 
     def objective(trial):
