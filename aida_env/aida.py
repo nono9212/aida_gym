@@ -109,6 +109,8 @@ class Aida:
         self._torque_control_enabled = torque_control_enabled
         self._motor_overheat_protection = motor_overheat_protection
         self._on_rack = on_rack
+        
+        self._targetPoint = [1,0]
         if self._accurate_motor_model_enabled:
             self._kp = motor_kp
             self._kd = motor_kd
@@ -125,8 +127,18 @@ class Aida:
         self.time_step = time_step
 
         self.Reset()
-  
-
+        
+    def getTarget(self):
+        return self._targetPoint
+        
+    def setTarget(self,o):
+        self._targetPoint = np.copy(o)
+        
+    def distToTarget(self):
+        
+        return np.array(list(self.GetBasePosition()[0:2])) - np.array(self.getTarget())
+        
+        
     def load_urdf(self):
         start_pose = [0,0,0.8]
         start_orientation = self._pybullet_client.getQuaternionFromEuler([0,0,0])
@@ -155,6 +167,7 @@ class Aida:
             self._pybullet_client.resetBaseVelocity(self.quadruped, [0, 0, 0],
                                                     [0, 0, 0])
             self.reset_all_legs()
+
         self._overheat_counter = np.zeros(self.num_motors)
         self._motor_enabled_list = [True] * self.num_motors
 
@@ -290,8 +303,7 @@ class Aida:
         upper_bound[self.num_motors:2 * self.num_motors] = 1.0
         upper_bound[2 * self.num_motors:3 * self.num_motors] = 1.0
         upper_bound[3 * self.num_motors:] = 1.0  
-        upper_bound[-3 :] = 100.0
-        upper_bound[-1] = 1
+        upper_bound[-2 :] = 1
         return upper_bound
 
     def GetObservationLowerBound(self):
@@ -301,8 +313,7 @@ class Aida:
         upper_bound[self.num_motors:2 * self.num_motors] = -1.0
         upper_bound[2 * self.num_motors:3 * self.num_motors] = -1.0
         upper_bound[3 * self.num_motors:] = 0  
-        upper_bound[-3 :] = -100.0
-        upper_bound[-1] = 0
+        upper_bound[-2 :] = -1
         return upper_bound
 
     def GetObservationDimension(self):
@@ -325,7 +336,7 @@ class Aida:
         observation.extend(self.GetMotorVelocities().tolist())
         observation.extend(self.GetMotorTorques().tolist())
         observation.extend(list(self.GetBaseOrientation()))
-        observation.extend(list(self.GetBasePosition()))
+        observation.extend(list(np.array(self.GetBasePosition()[0:2])-np.array(self.getTarget())))
         return observation
 
 

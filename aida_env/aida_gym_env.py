@@ -141,6 +141,7 @@ class AidaBulletEnv(gym.Env):
     self._direction_weight = direction_weight
     self._speed_weight = speed_weight
 
+    self._shapeID = -1
 
     #self._env_randomizer = env_randomizer
     # PD control needs smaller time step for stability.
@@ -154,15 +155,13 @@ class AidaBulletEnv(gym.Env):
           connection_mode=pybullet.GUI)
     else:
       self._pybullet_client = bullet_client.BulletClient()
-
+    
     self._seed()
     self.reset()
     observation_high = (
         self.aida.GetObservationUpperBound() + OBSERVATION_EPS)
-    observation_high = np.concatenate((observation_high,np.array([10,10])),axis=None)
     observation_low = (
         self.aida.GetObservationLowerBound() - OBSERVATION_EPS)
-    observation_low = np.concatenate((observation_low,np.array([-10,-10])),axis=None)
     action_dim = NUM_MOTORS
     action_high = np.array([self._action_bound] * action_dim)
     self.action_space = spaces.Box(-action_high, action_high)
@@ -218,7 +217,6 @@ class AidaBulletEnv(gym.Env):
 
     self._env_step_counter = 0
     self._last_base_position = [0, 0, 0]
-    self._objectives = []
     self._pybullet_client.resetDebugVisualizerCamera(
         self._cam_dist, self._cam_yaw, self._cam_pitch, [0, 0, 0])
     if not self._torque_control_enabled:
@@ -227,10 +225,13 @@ class AidaBulletEnv(gym.Env):
           self.aida.ApplyAction(-0.5 * np.ones(12))
         self._pybullet_client.stepSimulation()
     ret = self._noisy_observation()
-	
+    self._currentObjective = 0
+    self.aida.setTarget(self._commands[self._currentObjective])
+    pybullet.removeUserDebugItem(self._shapeID)
+    self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
     for i in range(50):
         self._step([-1,-1,1,  0,0,1,  -1,-1,1,  0,0,1])  # init
-		
+        
     return ret
 
   def _seed(self, seed=None):
@@ -350,7 +351,7 @@ class AidaBulletEnv(gym.Env):
     pos = self.aida.GetBasePosition()
     return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85 or
             pos[2] < 0.13)
-
+    
   def _termination(self):
     position = self.aida.GetBasePosition()
     distance = math.sqrt(position[0]**2 + position[1]**2)
@@ -358,12 +359,16 @@ class AidaBulletEnv(gym.Env):
 
   def _reward(self):
     current_base_position = self.aida.GetBasePosition()
-    distToTarget = np.array(list(current_base_position[0:2])) - np.array(self._commands[self._currentObjective])
+    distToTarget = self.aida.distToTarget()
     if(np.linalg.norm(distToTarget) < 0.4):
         self._currentObjective = (self._currentObjective+1)%len(self._commands)
+
+        self.aida.setTarget(self._commands[self._currentObjective])
+        pybullet.removeUserDebugItem(self._shapeID)
+        self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
         #if(self._is_render):
             #self.drawTarget(self.aida._targetPoint)
-
+    
 
     height_reward = np.exp(-((current_base_position[2]-0.6)**2)/0.05)
     
@@ -377,7 +382,7 @@ class AidaBulletEnv(gym.Env):
     actualDir = rot_mat[:2]
     actualDir /= np.linalg.norm(actualDir)
     direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.05)
-	
+    
     speed_reward = 1-np.exp(-np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo))
 
 
@@ -385,8 +390,8 @@ class AidaBulletEnv(gym.Env):
 
     return reward/(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
 
-  def get_objectives(self):
-    return self._objectives
+
+
 
   def _get_observation(self):
     self._observation = self.aida.GetObservation()
@@ -395,7 +400,6 @@ class AidaBulletEnv(gym.Env):
   def _noisy_observation(self):
     self._get_observation()
     observation = self._observation
-    observation.extend(list(self._commands[self._currentObjective]))
     observation = np.array(observation)
     if self._observation_noise_stdev > 0:
       observation += (np.random.normal(
