@@ -379,10 +379,12 @@ class AidaBulletEnv(gym.Env):
     actualDir /= np.linalg.norm(actualDir)
     direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.05)
 	
-    speed_reward = np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo)
+    speed_reward = 1-np.exp(-np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo))
 
-    return self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
 
+    reward = self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
+
+    return reward/(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
 
   def get_objectives(self):
     return self._objectives

@@ -28,12 +28,13 @@ LIMITS_CALFS = (math.degrees(0.2), math.degrees(2.2))
 LIMITS_THIGH = (math.degrees(-0.8), math.degrees(1.0))
 LIMITS_SHOULDER = (math.degrees(-0.6), math.degrees(0.2))
 
-LIMITS_MINS = np.array([LIMITS_CALFS[0], LIMITS_THIGH[0], LIMITS_SHOULDER[1]])
+LIMITS_MINS = np.array([LIMITS_CALFS[0], LIMITS_THIGH[0], LIMITS_SHOULDER[0]])
+LIMITS_MAX = np.array([LIMITS_CALFS[1], LIMITS_THIGH[1], LIMITS_SHOULDER[1]])
 LIMITS_SPAND = np.array([e - s for (s, e) in [LIMITS_CALFS, LIMITS_THIGH, LIMITS_SHOULDER]])
 
 def leg_scale(angles_in_01):
-    """ multiply inputs (between 0 and 1 to be in the angle scale)"""
-    return np.array(angles_in_01) * LIMITS_SPAND * 0.5  + LIMITS_MINS + LIMITS_SPAND / 2
+    """ multiply inputs (between -1 and 1 to be in the angle scale)"""
+    return (np.array(angles_in_01) * LIMITS_SPAND / 2) + ((LIMITS_MINS + LIMITS_MAX) / 2)
 
 def command_scale(angles):
     return np.concatenate([leg_scale(angles[i:i+3]) for i in [0, 3, 6, 9]])
@@ -259,6 +260,7 @@ class Aida:
         """
         _, orientation = (
             self._pybullet_client.getBasePositionAndOrientation(self.quadruped))
+
         return orientation
 
     def GetActionDimension(self):
@@ -274,6 +276,7 @@ class Aida:
           The upper bound of an observation. See GetObservation() for the details
             of each element of an observation.
         """
+        """        
         upper_bound = np.array([0.0] * self.GetObservationDimension())
         upper_bound[0:self.num_motors] = math.pi  # Joint angle.
         upper_bound[self.num_motors:2 * self.num_motors] = (
@@ -281,11 +284,24 @@ class Aida:
         upper_bound[2 * self.num_motors:3 * self.num_motors] = (
             motor.OBSERVED_TORQUE_LIMIT)  # Joint torque.
         upper_bound[3 * self.num_motors:] = 1.0  # Quaternion of base orientation.
+        """
+        upper_bound = np.array([0.0] * self.GetObservationDimension())
+        upper_bound[0:self.num_motors] = 1.0  # Joint angle.
+        upper_bound[self.num_motors:2 * self.num_motors] = 1.0
+        upper_bound[2 * self.num_motors:3 * self.num_motors] = 1.0
+        upper_bound[3 * self.num_motors:] = 1.0  
+        upper_bound[-3 :] = 100.0
         return upper_bound
 
     def GetObservationLowerBound(self):
         """Get the lower bound of the observation."""
-        return -self.GetObservationUpperBound()
+        upper_bound = np.array([0.0] * self.GetObservationDimension())
+        upper_bound[0:self.num_motors] = -1.0  # Joint angle.
+        upper_bound[self.num_motors:2 * self.num_motors] = -1.0
+        upper_bound[2 * self.num_motors:3 * self.num_motors] = -1.0
+        upper_bound[3 * self.num_motors:] = 0  
+        upper_bound[-3 :] = -100.0
+        return upper_bound
 
     def GetObservationDimension(self):
         """Get the length of the observation list.
@@ -335,7 +351,7 @@ class Aida:
           Motor angles.
         """
         motor_angles = [
-            self._pybullet_client.getJointState(self.quadruped, motor_id)[0]
+            self._pybullet_client.getJointState(self.quadruped, motor_id)[0]/math.pi
             for motor_id in self._motor_id_list
         ]
         motor_angles = np.multiply(motor_angles, self._motor_direction)
@@ -347,7 +363,7 @@ class Aida:
           Velocities of all eight motors.
         """
         motor_velocities = [
-            self._pybullet_client.getJointState(self.quadruped, motor_id)[1]
+            self._pybullet_client.getJointState(self.quadruped, motor_id)[1]/motor.MOTOR_SPEED_LIMIT
             for motor_id in self._motor_id_list
         ]
         motor_velocities = np.multiply(motor_velocities, self._motor_direction)
@@ -360,7 +376,7 @@ class Aida:
         """
         
         motor_torques = [
-          self._pybullet_client.getJointState(self.quadruped, motor_id)[3]
+          self._pybullet_client.getJointState(self.quadruped, motor_id)[3]/motor.OBSERVED_TORQUE_LIMIT
           for motor_id in self._motor_id_list
         ]
         motor_torques = np.multiply(motor_torques, self._motor_direction)

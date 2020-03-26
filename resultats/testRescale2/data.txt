@@ -1,0 +1,27 @@
+{
+    "cliprange": 0.2,
+    "cliprange_vf": -1.0,
+    "default_reward": 2.0,
+    "direction_weight": 1.0,
+    "ent_coef": 0.01,
+    "gamma": 0.99,
+    "height_weight": 4.0,
+    "lam": 0.95,
+    "layers": [
+        100,
+        100
+    ],
+    "learning_rate": 0.00025,
+    "max_grad_norm": 0.5,
+    "n_steps": 128,
+    "name": "testRescale2",
+    "nminibatches": 4,
+    "noptepochs": 4,
+    "normalize": false,
+    "orientation_weight": 1.0,
+    "resume_from": null,
+    "save_every": 500000,
+    "speed_weight": 0.0,
+    "total_steps": 10000000,
+    "vf_coef": 0.5
+}
