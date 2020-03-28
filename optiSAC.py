@@ -24,7 +24,7 @@ import os
 
 
 
-def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=None,
+def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None,
                             n_jobs=1, sampler_method='random', pruner_method='halving',
                             seed=1, verbose=1):
     """
@@ -49,7 +49,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
     # test during 3000 steps
     n_test_steps = 1500
     # evaluate every 20th of the maximum budget per iteration
-    n_evaluations = 40
+    n_evaluations = 20
     evaluate_interval = int(n_timesteps / n_evaluations)
 
     # n_warmup_steps: Disable pruner until the trial reaches the given number of step.
@@ -125,6 +125,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                     rewards.append(reward_sum)
                     reward_sum = 0.0
                     obs = self_.test_env.reset()
+                    n_steps_done = n_test_steps
             rewards.append(reward_sum)
             mean_reward = np.mean(rewards)
             summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
