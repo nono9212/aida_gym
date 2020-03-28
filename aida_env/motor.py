@@ -92,6 +92,6 @@ class MotorModel(object):
 
     # Saturate torque based on empirical current relation.
     actual_torque = np.interp(current_magnitude, self._current_table,
-                              self._torque_table)
+                              self._torque_table)*10
     actual_torque = np.multiply(current_sign, actual_torque)
     return actual_torque, observed_torque

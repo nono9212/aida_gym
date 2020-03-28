@@ -140,7 +140,8 @@ class AidaBulletEnv(gym.Env):
     self._direction_weight = direction_weight
     self._direction_weight = direction_weight
     self._speed_weight = speed_weight
-
+	
+    self._rewardLineID = -1
     self._shapeID = -1
 
     #self._env_randomizer = env_randomizer
@@ -370,12 +371,12 @@ class AidaBulletEnv(gym.Env):
             #self.drawTarget(self.aida._targetPoint)
     
 
-    height_reward = np.exp(-((current_base_position[2]-0.6)**2)/0.05)
+    height_reward = np.exp(-((current_base_position[2]-0.7)**2)/0.15)
     
     orientation = self.aida.GetBaseOrientation()
     rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
     local_up = rot_mat[6:]
-    orientation_reward = np.exp(-((np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-1)**2)/0.05)
+    orientation_reward = np.exp(-((np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-1)**2)/0.005)
     
     dirTo = distToTarget 
     dirTo /= np.linalg.norm(dirTo)
@@ -383,13 +384,15 @@ class AidaBulletEnv(gym.Env):
     actualDir /= np.linalg.norm(actualDir)
     direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.05)
     
-    speed_reward = 1-np.exp(-np.dot(self.aida.GetBaseLinearVelocity()[0:2],dirTo))
+    speed_reward = np.max(1-np.exp(-np.dot(np.array(self.aida.GetBaseLinearVelocity()[0:2]),dirTo)*5),0)
 
 
     reward = self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
+    reward /=(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
+    #pybullet.removeUserDebugItem(self._rewardLineID)
+    #self._rewardLineID = pybullet.addUserDebugLine([0,0,0],[0,0,reward],lineColorRGB=[0.5,1,0], lineWidth=10)
 
-    return reward/(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
-
+    return reward
 
 
 
