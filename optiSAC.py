@@ -142,7 +142,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
 
             return True
         commands = [[1,0],[2,0],[3,0]]
-        env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
+        env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
                                                   render  = False, 
                                                   on_rack = False,
                                                   default_reward     = 2,
@@ -151,7 +151,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                                                   direction_weight   = 2,
                                                   speed_weight       = 4
                                                   )
-                        for i in range(32)])
+                        ])
 
 
         model = SAC(MlpPolicy, 
