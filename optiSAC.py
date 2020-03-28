@@ -26,7 +26,7 @@ import os
 
 def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=None,
                             n_jobs=1, sampler_method='random', pruner_method='halving',
-                            seed=0, verbose=1):
+                            seed=1, verbose=1):
     """
     :param algo: (str)
     :param model_fn: (func) function that is used to instantiate the model
@@ -143,7 +143,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
             return True
         commands = [[1,0],[2,0],[3,0]]
         env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-                                                  render  = False, 
+                                                  render  = True, 
                                                   on_rack = False,
                                                   default_reward     = 2,
                                                   height_weight      = 5,
@@ -168,6 +168,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                   policy_kwargs=kwargs['policy_kwargs'],
                  tensorboard_log = "./optimisationSAC/logOPTI"
                )
+
         model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
                                                   render  = False, 
                                                   on_rack = False,
@@ -178,6 +179,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                                                   speed_weight       = 2
                                                   )
                         ])
+
 
         model.trial = trial
        
