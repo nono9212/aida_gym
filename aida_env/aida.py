@@ -136,7 +136,7 @@ class Aida:
         
     def distToTarget(self):
         
-        return np.array(list(self.GetBasePosition()[0:2])) - np.array(self.getTarget())
+        return np.array(-np.array(self.GetBasePosition()[0:2]) + np.array(self.getTarget()))
         
         
     def load_urdf(self):
