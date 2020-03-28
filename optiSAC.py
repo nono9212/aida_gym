@@ -12,7 +12,7 @@ from stable_baselines.common.base_class import _UnvecWrapper
 import gym
 
 import tensorflow as tf
-from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.sac.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 from stable_baselines import PPO2
 import aida_env.aida_gym_env as e
@@ -68,7 +68,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
     pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
 
 
-    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimization.db',load_if_exists=True)
+    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
 
 
     def objective(trial):
@@ -149,12 +149,12 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                                                   height_weight      = 5,
                                                   orientation_weight = 3,
                                                   direction_weight   = 2,
-                                                  speed_weight       = 2
+                                                  speed_weight       = 4
                                                   )
                         for i in range(32)])
 
 
-        model = PPO2(MlpPolicy, 
+        model = SAC(MlpPolicy, 
                  env, 
                   gamma=kwargs['gamma':],
                   learning_rate= kwargs['learning_rate'],
@@ -198,7 +198,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
             is_pruned = model.is_pruned
             cost = -1 * model.last_mean_test_reward
         try:
-            os.mkdir("./optimisation/resultats/"+str(trial.number))
+            os.mkdir("./optimisationSAC/resultats/"+str(trial.number))
         except FileExistsError:
             print("Directory already exists")
             
