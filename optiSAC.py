@@ -24,9 +24,9 @@ import os
 
 
 
-def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=None,
+def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None,
                             n_jobs=1, sampler_method='random', pruner_method='halving',
-                            seed=0, verbose=1):
+                            seed=35, verbose=1):
     """
     :param algo: (str)
     :param model_fn: (func) function that is used to instantiate the model
@@ -68,7 +68,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
     pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
 
 
-    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
+    study = optuna.create_study(study_name="optimisation_SAC", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
 
 
     def objective(trial):
@@ -125,6 +125,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                     rewards.append(reward_sum)
                     reward_sum = 0.0
                     obs = self_.test_env.reset()
+                    n_steps_done = n_test_steps
             rewards.append(reward_sum)
             mean_reward = np.mean(rewards)
             summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
