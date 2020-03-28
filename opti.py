@@ -149,7 +149,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
                                                   height_weight      = 5,
                                                   orientation_weight = 3,
                                                   direction_weight   = 2,
-                                                  speed_weight       = 2
+                                                  speed_weight       = 5
                                                   )
                         for i in range(32)])
         if(kwargs['normalize']):

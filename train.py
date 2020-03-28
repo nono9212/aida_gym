@@ -116,7 +116,7 @@ if __name__ == '__main__':
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
 		
 	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-												  render  = True, 
+												  render  = False, 
 												  on_rack = False,
 												  default_reward     = args.default_reward,
 												  height_weight      = args.height_weight,
