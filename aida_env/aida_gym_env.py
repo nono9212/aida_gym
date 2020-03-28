@@ -390,7 +390,6 @@ class AidaBulletEnv(gym.Env):
     reward = self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
 
     reward /=(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
-    print(reward)
     #pybullet.removeUserDebugItem(self._rewardLineID)
     #self._rewardLineID = pybullet.addUserDebugLine([0,0,0],[0,0,reward],lineColorRGB=[0.5,1,0], lineWidth=10)
     
