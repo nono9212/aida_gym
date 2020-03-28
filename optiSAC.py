@@ -156,7 +156,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
 
         model = SAC(MlpPolicy, 
                  env, 
-                  gamma=kwargs['gamma':],
+                  gamma=kwargs['gamma'],
                   learning_rate= kwargs['learning_rate'],
                   batch_size=kwargs['batch_size'],
                   buffer_size=kwargs['buffer_size'],
