@@ -31,13 +31,14 @@ if __name__ == '__main__':
                     help='Total number of steps to train the model (default: 10 000 000)')
 	parser.add_argument('--save_every', default=500000, type=int,
                     help='The number of step to train the model before saving (default: 500 000)')
-	
+	parser.add_argument('--algo', default="ppo2", type=string,
+                    help='The algorythme to be used, ppo2 or sac (default: ppo2)')	
 	
 	parser.add_argument('--gamma', type=float, default=0.99,
                     help='Discount factor (default: 0.99)')
 	parser.add_argument('--n_steps', type=int, default=128,
                     help='The number of steps to run for each environment per update (default: 128)')
-	parser.add_argument('--ent_coef', type=float, default=0.01,
+	parser.add_argument('--ent_coefppo2', type=float, default=0.01,
                     help='Entropy coefficient for the loss calculation (default: 0.01)')
 	parser.add_argument('--learning_rate', type=float, default=0.00025,
                     help='The learning rate (default: 0.00025)')
@@ -69,7 +70,22 @@ if __name__ == '__main__':
 					help='Multiplicator of the reward telling if aida faces its objective (default: 1.0)')	
 	parser.add_argument('--speed_weight', default=0.0, type=float,
 					help='Multiplicator of the speed reward (default: 0.0)')	
-				
+
+	parser.add_argument('--batch_size', default=64, type=int,
+					help=' (int) Minibatch size for each gradient update (default: 64)')	
+	parser.add_argument('--buffer_size', default=50000, type=int,
+					help=' (int) size of the replay buffer (default: 50000)')	
+	parser.add_argument('--learning_starts', default=100, type=int,
+					help=' (int) how many steps of the model to collect transitions for before learning starts(default: 100)')	
+	parser.add_argument('--train_freq', default=1, type=int,
+					help='(int) Update the model every train_freq steps. (default: 1)')	
+	parser.add_argument('--gradient_steps', default=1, type=int,
+					help='(int) How many gradient update after each step (default: 1)')	
+	parser.add_argument('--target_entropy', default='auto',
+					help=' (str or float) target entropy when learning ent_coef (ent_coef = ‘auto’) (default: 0.0)')						
+	parser.add_argument('--ent_coefsac', default='auto',
+                    help='(str or float) Entropy regularization coefficient. (Equivalent to inverse of reward scale in the original SAC paper.) Controlling exploration/exploitation trade-off. Set it to ‘auto’ to learn it automatically (and ‘auto_0.1’ for using 0.1 as initial value)')
+
 	args = parser.parse_args()
 	
 	model_name  = args.name
@@ -129,47 +145,71 @@ if __name__ == '__main__':
 	if normalize:
 		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)
 
+	if(args['algo'] == "ppo2):
+		model = PPO2(MlpPolicy, 
+					 env, 
 
-	model = PPO2(MlpPolicy, 
-				 env, 
+					 gamma           = args.gamma,
+					 n_steps         = args.n_steps,
+					 ent_coef        = args.ent_coefppo2,
+					 learning_rate   = args.learning_rate,
+					 vf_coef         = args.vf_coef,
+					 max_grad_norm   = args.max_grad_norm,
+					 lam             = args.lam,
+					 nminibatches    = args.nminibatches,
+					 noptepochs      = args.noptepochs,
+					 cliprange       = args.cliprange,
+					 cliprange_vf    = args.cliprange_vf,
+					 verbose         = 0,
+					 policy_kwargs   = dict(layers=args.layers),
+					 tensorboard_log = workDirectory+"/log"
+				   )
+		
+		if name_resume!=None:
 
-				 gamma           = args.gamma,
-				 n_steps         = args.n_steps,
-				 ent_coef        = args.noptepochs,
-				 learning_rate   = args.learning_rate,
-				 vf_coef         = args.vf_coef,
-				 max_grad_norm   = args.max_grad_norm,
-				 lam             = args.lam,
-				 nminibatches    = args.nminibatches,
-				 noptepochs      = args.noptepochs,
-				 cliprange       = args.cliprange,
-				 cliprange_vf    = args.cliprange_vf,
-				 verbose         = 0,
-				 policy_kwargs   = dict(layers=args.layers),
-				 tensorboard_log = workDirectory+"/log"
-			   )
-	
-	if name_resume!=None:
-
-		model = PPO2.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip",
-						     env=env,
-						     gamma           = args.gamma,
-							 n_steps         = args.n_steps,
-							 ent_coef        = args.noptepochs,
-							 learning_rate   = args.learning_rate,
-							 vf_coef         = args.vf_coef,
-							 max_grad_norm   = args.max_grad_norm,
-							 lam             = args.lam,
-							 nminibatches    = args.nminibatches,
-							 noptepochs      = args.noptepochs,
-							 cliprange       = args.cliprange,
-							 cliprange_vf    = args.cliprange_vf,
-							 verbose         = 0,
-							 policy_kwargs   = dict(layers=args.layers),
-							 tensorboard_log = workDirectory+"/log"
-						)
+			model = PPO2.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip",
+								 env=env,
+								 gamma           = args.gamma,
+								 n_steps         = args.n_steps,
+								 ent_coef        = args.ent_coefppo2,
+								 learning_rate   = args.learning_rate,
+								 vf_coef         = args.vf_coef,
+								 max_grad_norm   = args.max_grad_norm,
+								 lam             = args.lam,
+								 nminibatches    = args.nminibatches,
+								 noptepochs      = args.noptepochs,
+								 cliprange       = args.cliprange,
+								 cliprange_vf    = args.cliprange_vf,
+								 verbose         = 0,
+								 policy_kwargs   = dict(layers=args.layers),
+								 tensorboard_log = workDirectory+"/log")
 		if normalize:
-			env.load_running_average(workDirectory+"/resultats/"+name_resume+"/normalizeData")	 
+			env.load_running_average(workDirectory+"/resultats/"+name_resume+"/normalizeData")	
+							
+							
+							
+	elif(args.algo == "sac"):
+        model = SAC(MlpPolicy, 
+                 env, 
+                  gamma=args.gamma,
+                  learning_rate= args.learning_rate,
+				  
+                  batch_size=args.batch_size,
+                  buffer_size=args.buffer_size,
+                  learning_starts=args.learning_starts,
+                  train_freq=args.train_freq,
+                  gradient_steps=args.gradient_steps,
+                  ent_coef=args.ent_coefsac,
+                  target_entropy=args.target_entropy,
+				  
+                  policy_kwargs   = dict(layers=args.layers),
+                 tensorboard_log = workDirectory+"/log"
+               )
+	
+	
+	
+	
+ 
 			
 	for i in range(args.total_steps//args.save_every):
 		model.learn(total_timesteps=args.save_every, tb_log_name=model_name, reset_num_timesteps=False)
