@@ -143,7 +143,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=1500000, hyperparams=Non
             return True
         commands = [[1,0],[2,0],[3,0]]
         env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-                                                  render  = True, 
+                                                  render  = False, 
                                                   on_rack = False,
                                                   default_reward     = 2,
                                                   height_weight      = 5,
