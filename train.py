@@ -1,9 +1,10 @@
 import gym
 import numpy as np
 
-from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.common.policies import MlpPolicy as MlpPolicyPPO2
+from stable_baselines.sac.policies import MlpPolicy as MlpPolicySAC
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-from stable_baselines import PPO2
+from stable_baselines import PPO2,SAC
 import aida_env.aida_gym_env as e
 import pybullet as p
 import argparse
@@ -31,7 +32,7 @@ if __name__ == '__main__':
                     help='Total number of steps to train the model (default: 10 000 000)')
 	parser.add_argument('--save_every', default=500000, type=int,
                     help='The number of step to train the model before saving (default: 500 000)')
-	parser.add_argument('--algo', default="ppo2", type=string,
+	parser.add_argument('--algo', default="ppo2", type=str,
                     help='The algorythme to be used, ppo2 or sac (default: ppo2)')	
 	
 	parser.add_argument('--gamma', type=float, default=0.99,
@@ -145,8 +146,8 @@ if __name__ == '__main__':
 	if normalize:
 		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)
 
-	if(args['algo'] == "ppo2):
-		model = PPO2(MlpPolicy, 
+	if(args.algo == "ppo2"):
+		model = PPO2(MlpPolicyPPO2, 
 					 env, 
 
 					 gamma           = args.gamma,
@@ -189,22 +190,22 @@ if __name__ == '__main__':
 							
 							
 	elif(args.algo == "sac"):
-        model = SAC(MlpPolicy, 
-                 env, 
-                  gamma=args.gamma,
-                  learning_rate= args.learning_rate,
-				  
-                  batch_size=args.batch_size,
-                  buffer_size=args.buffer_size,
-                  learning_starts=args.learning_starts,
-                  train_freq=args.train_freq,
-                  gradient_steps=args.gradient_steps,
-                  ent_coef=args.ent_coefsac,
-                  target_entropy=args.target_entropy,
-				  
-                  policy_kwargs   = dict(layers=args.layers),
-                 tensorboard_log = workDirectory+"/log"
-               )
+		model = SAC(MlpPolicySAC, 
+			env, 
+			gamma=args.gamma,
+			learning_rate= args.learning_rate,
+
+			batch_size=args.batch_size,
+			buffer_size=args.buffer_size,
+			learning_starts=args.learning_starts,
+			train_freq=args.train_freq,
+			gradient_steps=args.gradient_steps,
+			ent_coef=args.ent_coefsac,
+			target_entropy=args.target_entropy,
+
+			policy_kwargs   = dict(layers=args.layers),
+			tensorboard_log = workDirectory+"/log"
+			)
 	
 	
 	
