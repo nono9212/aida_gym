@@ -131,8 +131,20 @@ if __name__ == '__main__':
 	commands = [[1,0],[2,0],[3,0]]
 	for i in range(5):
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
-		
-	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+	
+	if(args.algo == "sac"):
+		env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+													  render  = False, 
+													  on_rack = False,
+													  default_reward     = args.default_reward,
+													  height_weight      = args.height_weight,
+													  orientation_weight = args.orientation_weight,
+													  direction_weight   = args.direction_weight,
+													  speed_weight       = args.speed_weight
+													  )
+							])
+	elif(args.algo == "ppo2"):
+		env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
 												  render  = False, 
 												  on_rack = False,
 												  default_reward     = args.default_reward,
@@ -141,8 +153,9 @@ if __name__ == '__main__':
 												  direction_weight   = args.direction_weight,
 												  speed_weight       = args.speed_weight
 												  )
-						for i in range(1)])
-	
+						for i in range(32)])
+						
+						
 	if normalize:
 		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)
 
@@ -207,8 +220,61 @@ if __name__ == '__main__':
 			tensorboard_log = workDirectory+"/log"
 			)
 	
-	
-	
+	model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+													  render  = False, 
+													  on_rack = False,
+													  default_reward     = args.default_reward,
+													  height_weight      = args.height_weight,
+													  orientation_weight = args.orientation_weight,
+													  direction_weight   = args.direction_weight,
+													  speed_weight       = args.speed_weight
+													  )
+							])
+							
+	def callback(_locals, _globals):
+		"""
+		Callback for monitoring learning progress.
+		:param _locals: (dict)
+		:param _globals: (dict)
+		:return: (bool) If False: stop training
+		"""
+		self_ = _locals['self']
+
+
+		# Initialize variables
+		if not hasattr(self_, 'began'):
+			self_.began = True
+			self_.last_time_evaluated = 0
+
+		if (self_.num_timesteps - self_.last_time_evaluated) < 50000:
+			return True
+
+		self_.last_time_evaluated = self_.num_timesteps
+
+		# Evaluate the trained agent on the test env
+		rewards = []
+		n_steps_done, reward_sum = 0, 0.0
+
+
+		obs = self_.test_env.reset()
+		while n_steps_done < 1500:
+			# Use default value for deterministic
+			action, _ = self_.predict(obs, deterministic = True)
+			obs, reward, done, _ = self_.test_env.step(action)
+			reward_sum += reward
+			n_steps_done += 1
+
+			if done:
+				rewards.append(reward_sum)
+				reward_sum = 0.0
+				obs = self_.test_env.reset()
+				break
+		rewards.append(reward_sum)
+		mean_reward = np.mean(rewards)
+		summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
+		_locals['writer'].add_summary(summary, self_.num_timesteps)
+
+		return True	
 	
  
 			
