@@ -24,9 +24,9 @@ import os
 
 
 
-def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None,
+def hyperparam_optimization(   n_trials=60, n_timesteps=200000, hyperparams=None,
                             n_jobs=1, sampler_method='random', pruner_method='halving',
-                            seed=1, verbose=1):
+                            seed=2, verbose=1):
     """
     :param algo: (str)
     :param model_fn: (func) function that is used to instantiate the model
@@ -49,7 +49,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
     # test during 3000 steps
     n_test_steps = 1500
     # evaluate every 20th of the maximum budget per iteration
-    n_evaluations = 20
+    n_evaluations = 40
     evaluate_interval = int(n_timesteps / n_evaluations)
 
     # n_warmup_steps: Disable pruner until the trial reaches the given number of step.
@@ -58,17 +58,17 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
 
     #sampler = RandomSampler(seed=seed)
 
-    #sampler = TPESampler(n_startup_trials=5, seed=seed)
+    sampler = TPESampler(n_startup_trials=5, seed=seed)
 
-    sampler = SkoptSampler(skopt_kwargs={'base_estimator': "GP", 'acq_func': 'gp_hedge'})
+    #sampler = SkoptSampler(skopt_kwargs={'base_estimator': "GP", 'acq_func': 'gp_hedge'})
 
 
     #pruner = SuccessiveHalvingPruner(min_resource=1, reduction_factor=4, min_early_stopping_rate=0)
 
-    pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
+    pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 7)
 
 
-    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
+    study = optuna.create_study(study_name="optimisation_SAC", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
 
 
     def objective(trial):
@@ -125,7 +125,6 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
                     rewards.append(reward_sum)
                     reward_sum = 0.0
                     obs = self_.test_env.reset()
-                    n_steps_done = n_test_steps
             rewards.append(reward_sum)
             mean_reward = np.mean(rewards)
             summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
@@ -177,7 +176,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
                                                   height_weight      = 5,
                                                   orientation_weight = 3,
                                                   direction_weight   = 2,
-                                                  speed_weight       = 2
+                                                  speed_weight       = 4
                                                   )
                         ])
 
@@ -185,7 +184,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
         model.trial = trial
        
         try:
-            model.learn(n_timesteps, callback=callback)
+            model.learn(n_timesteps, callback=callback, tb_log_name="SAC_"+str(trial.number))
             # Free memory
             model.env.close()
             model.test_env.close()
@@ -207,7 +206,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
             
 
 
-        model.save("./optimisation/resultats/"+str(trial.number)+"/"+str(trial.number))    
+        model.save("./optimisationSAC/resultats/"+str(trial.number)+"/"+str(trial.number))    
 
 
         del model.env, model.test_env
@@ -248,7 +247,7 @@ def sample_sac_params(trial):
     :return: (dict)
     """
     gamma = trial.suggest_categorical('gamma', [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
-    learning_rate = trial.suggest_loguniform('lr', 1e-5, 1)
+    learning_rate = trial.suggest_loguniform('lr', 1e-5, 0.01)
     batch_size = trial.suggest_categorical('batch_size', [16, 32, 64, 128, 256, 512])
     buffer_size = trial.suggest_categorical('buffer_size', [int(1e4), int(1e5), int(1e6)])
     learning_starts = trial.suggest_categorical('learning_starts', [0, 1000, 10000, 20000])

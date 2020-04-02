@@ -68,14 +68,25 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
     pruner = MedianPruner(n_startup_trials=5, n_warmup_steps=n_evaluations // 3)
 
 
-    study = optuna.create_study(study_name="optimisation_PPO2", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationSAC.db',load_if_exists=True)
+    study = optuna.create_study(study_name="optimisation_TD3", sampler = sampler , pruner=pruner, storage='sqlite:///optimizationTD3.db',load_if_exists=True)
 
 
     def objective(trial):
 
         kwargs = hyperparams.copy()
-
+        commands = [[1,0],[2,0],[3,0]]
         trial.model_class = None
+        env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+                                          render  = False, 
+                                          on_rack = False,
+                                          default_reward     = 2,
+                                          height_weight      = 5,
+                                          orientation_weight = 3,
+                                          direction_weight   = 2,
+                                          speed_weight       = 4
+                                          )
+                ])
+        trial.n_actions = env.action_space.shape[0]
 
         kwargs.update(sample_td3_params(trial))
 
@@ -142,17 +153,7 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
                 return False
 
             return True
-        commands = [[1,0],[2,0],[3,0]]
-        env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-                                                  render  = True, 
-                                                  on_rack = False,
-                                                  default_reward     = 2,
-                                                  height_weight      = 5,
-                                                  orientation_weight = 3,
-                                                  direction_weight   = 2,
-                                                  speed_weight       = 4
-                                                  )
-                        ])
+
 
 
         model = TD3(MlpPolicy, 
@@ -163,8 +164,8 @@ def hyperparam_optimization(   n_trials=20, n_timesteps=100000, hyperparams=None
                   buffer_size=kwargs['buffer_size'],
                   train_freq=kwargs['train_freq'],
                   gradient_steps=kwargs['gradient_steps'],
-				  action_noise=kwargs['action_noise'],
-                 tensorboard_log = "./optimisationSAC/logOPTI"
+                  action_noise=kwargs['action_noise'],
+                 tensorboard_log = "./optimisationTD3/logOPTI"
                )
 
         model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
