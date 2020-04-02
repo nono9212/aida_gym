@@ -4,7 +4,7 @@ import numpy as np
 
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
-from stable_baselines import PPO2
+from stable_baselines import PPO2,TD3,SAC
 import aida_env.aida_gym_env as e
 import pybullet as p
 import argparse
@@ -19,15 +19,20 @@ parser.add_argument('--name', default=None, required = True,
 				help='Name of the model (required)')
 parser.add_argument('--normalize', type=bool, default=False, 
                     help='Normalize the environement for training (default: False)')
+parser.add_argument('--algo', type=str, default="ppo2", 
+                    help='Algorithm used to train the model')
 args = parser.parse_args()
 name_resume = args.name
 normalize   = args.normalize
-commands = [[1,0],[2,0],[3,0]]
+commands = [[-1,0],[-2,0],[-3,-1],[-3.5,-2],[-3.5,-3],[-3.5,-5],[-2,-6],[0,-7],[2,-6]]
 if name_resume!=None:
 
-	model = PPO2.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip")
-
-	
+	if(args.algo=="ppo2"):
+		model = PPO2.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip")
+	elif(args.algo=="sac"):
+		model = SAC.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip")
+	elif(args.algo=="td3"):
+		model = TD3.load(   workDirectory+"/resultats/"+name_resume+"/"+name_resume+".zip")	
 env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 										  render  = False, 
 										  on_rack = False,
@@ -45,5 +50,6 @@ for i in range(15*2*10):
 	action, _ = model.predict(obs)
 	obs, _, _ ,_ = env.step(action)
 	img = env.render(mode='rgb_array')
+	print("frame "+str(i) +"/"+str(2*150))
 
 imageio.mimsave(workDirectory+"/resultats/"+name_resume+"/video/"+name_resume+".gif", [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=20)

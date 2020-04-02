@@ -12,7 +12,10 @@ import imageio
 import time
 import os
 import json
-
+import tensorflow as tf
+from stable_baselines import TD3
+from stable_baselines.td3.policies import MlpPolicy as MlpPolicyTD3
+from stable_baselines.ddpg.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
 if __name__ == '__main__':
 
@@ -63,15 +66,17 @@ if __name__ == '__main__':
 					
 	parser.add_argument('--default_reward', default=2.0, type=float,
 					help='Reward aida gets for staying alive at each step (default: 2.0)')	
-	parser.add_argument('--height_weight', default=4.0, type=float,
+	parser.add_argument('--height_weight', default=2.0, type=float,
 					help='Multiplicator of the height reward (default: 4.0)')		
 	parser.add_argument('--orientation_weight', default=1.0, type=float,
 					help='Multiplicator of the reward telling if aida stands straight (default: 1.0)')	
-	parser.add_argument('--direction_weight', default=1.0, type=float,
+	parser.add_argument('--direction_weight', default=2.0, type=float,
 					help='Multiplicator of the reward telling if aida faces its objective (default: 1.0)')	
-	parser.add_argument('--speed_weight', default=0.0, type=float,
+	parser.add_argument('--speed_weight', default=10.0, type=float,
 					help='Multiplicator of the speed reward (default: 0.0)')	
-
+	parser.add_argument('--mimic_weight', default=20.0, type=float,
+					help='Multiplicator of the speed reward (default: 0.0)')
+					
 	parser.add_argument('--batch_size', default=64, type=int,
 					help=' (int) Minibatch size for each gradient update (default: 64)')	
 	parser.add_argument('--buffer_size', default=50000, type=int,
@@ -128,23 +133,37 @@ if __name__ == '__main__':
 	with open(workDirectory+"/resultats/"+model_name+'/data.txt', 'w') as outfile:
 		json.dump(vars(args), outfile,sort_keys=True,indent=4)
 	
-	commands = [[1,0],[2,0],[3,0]]
+	commands = [[-1,0],[-2,0],[-3,-1],[-3.5,-2],[-3.5,-3],[-3.5,-5],[-2,-6],[0,-7],[2,-6]]
 	for i in range(5):
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
-		
-	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-												  render  = False, 
-												  on_rack = False,
-												  default_reward     = args.default_reward,
-												  height_weight      = args.height_weight,
-												  orientation_weight = args.orientation_weight,
-												  direction_weight   = args.direction_weight,
-												  speed_weight       = args.speed_weight
-												  )
-						for i in range(1)])
+	
+	if(args.algo=="td3" or args.algo == "sac"):
+		env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+													  render  = False, 
+													  on_rack = False,
+													  default_reward     = args.default_reward,
+													  height_weight      = args.height_weight,
+													  orientation_weight = args.orientation_weight,
+													  direction_weight   = args.direction_weight,
+													  speed_weight       = args.speed_weight,
+													  mimic_weight       = args.mimic_weight
+													  )
+							])
+	else:
+		env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
+											  render  = False, 
+											  on_rack = False,
+											  default_reward     = args.default_reward,
+											  height_weight      = args.height_weight,
+											  orientation_weight = args.orientation_weight,
+											  direction_weight   = args.direction_weight,
+											  speed_weight       = args.speed_weight,
+											  mimic_weight       = args.mimic_weight
+											  )
+					for i in range(32)])
 	
 	if normalize:
-		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma)
+		env = VecNormalize(env, gamma=args.gamma)
 
 	if(args.algo == "ppo2"):
 		model = PPO2(MlpPolicyPPO2, 
@@ -206,14 +225,89 @@ if __name__ == '__main__':
 			policy_kwargs   = dict(layers=args.layers),
 			tensorboard_log = workDirectory+"/log"
 			)
-	
-	
-	
-	
- 
-			
+	elif(args.algo=="td3"):
+		n_actions = env.action_space.shape[-1]
+		#action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.02 * np.ones(n_actions))
+		action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=0.02 * np.ones(n_actions), theta=0.15, dt=0.01, initial_noise=None)
+		model = TD3(MlpPolicyTD3, 
+				env, 
+				action_noise=action_noise,
+				verbose=1,
+				policy_kwargs   = dict(layers=[400,300]) ,
+				tensorboard_log = workDirectory+"/log"
+				)
+
+	model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
+											  render  = False, 
+											  on_rack = False,
+											  default_reward     = args.default_reward,
+											  height_weight      = args.height_weight,
+											  orientation_weight = args.orientation_weight,
+											  direction_weight   = args.direction_weight,
+											  speed_weight       = args.speed_weight,
+											  mimic_weight       = args.mimic_weight
+											  )
+					])
+	if normalize:
+		model.test_env = VecNormalize(model.test_env, gamma=args.gamma)
+		
+		
+	def callback(_locals, _globals):
+		"""
+		Callback for monitoring learning progress.
+		:param _locals: (dict)
+		:param _globals: (dict)
+		:return: (bool) If False: stop training
+		"""
+		self_ = _locals['self']
+
+
+		# Initialize variables
+		if not hasattr(self_, 'started'):
+			self_.started = False
+			self_.last_time_evaluated = 0
+
+		if (self_.num_timesteps - self_.last_time_evaluated) < 10000:
+			return True
+
+		self_.last_time_evaluated = self_.num_timesteps
+
+		# Evaluate the trained agent on the test env
+		rewards = []
+		n_steps_done, reward_sum = 0, 0.0
+
+		# Sync the obs rms if using vecnormalize
+		# NOTE: this does not cover all the possible cases
+		if isinstance(self_.test_env, VecNormalize):
+			self_.test_env.obs_rms = deepcopy(self_.env.obs_rms)
+			self_.test_env.ret_rms = deepcopy(self_.env.ret_rms)
+			# Do not normalize reward
+			self_.test_env.norm_reward = False
+
+		obs = self_.test_env.reset()
+		while n_steps_done < 1500:
+			# Use default value for deterministic
+			action, _ = self_.predict(obs,)
+			obs, reward, done, _ = self_.test_env.step(action)
+			reward_sum += reward
+			n_steps_done += 1
+
+			if done:
+				rewards.append(reward_sum)
+				reward_sum = 0.0
+				obs = self_.test_env.reset()
+				n_steps_done = 1500
+				
+		rewards.append(reward_sum)
+		mean_reward = np.mean(rewards)
+		summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
+		_locals['writer'].add_summary(summary, self_.num_timesteps)
+		self_.last_mean_test_reward = mean_reward
+		return True
+		
+		
 	for i in range(args.total_steps//args.save_every):
-		model.learn(total_timesteps=args.save_every, tb_log_name=model_name, reset_num_timesteps=False)
+		model.learn(total_timesteps=args.save_every, tb_log_name=model_name, reset_num_timesteps=False, callback=callback)
 		if normalize:
 			env.save_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 		model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)
@@ -230,11 +324,12 @@ if __name__ == '__main__':
 											  height_weight      = args.height_weight,
 											  orientation_weight = args.orientation_weight,
 											  direction_weight   = args.direction_weight,
-											  speed_weight       = args.speed_weight
+											  speed_weight       = args.speed_weight,
+											  mimic_weight       = args.mimic_weight
 											  )
 					])
 	if normalize:
-		env = VecNormalize(env, clip_obs=1000.0, clip_reward=1000.0, gamma=args.gamma, training = False)
+		env = VecNormalize(env, gamma=args.gamma, training = False)
 		env.load_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 
 	images = []

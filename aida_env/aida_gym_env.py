@@ -20,10 +20,10 @@ MOTOR_TORQUE_OBSERVATION_INDEX = MOTOR_VELOCITY_OBSERVATION_INDEX + NUM_MOTORS
 BASE_ORIENTATION_OBSERVATION_INDEX = MOTOR_TORQUE_OBSERVATION_INDEX + NUM_MOTORS
 ACTION_EPS = 0.01
 OBSERVATION_EPS = 0.01
-RENDER_HEIGHT = 720
-RENDER_WIDTH = 960
+RENDER_HEIGHT = 360
+RENDER_WIDTH = 480
 
-
+    
 class AidaBulletEnv(gym.Env):
   """The gym environment for aida.
   It simulates the locomotion of aida, a quadruped robot. The state space
@@ -48,6 +48,7 @@ class AidaBulletEnv(gym.Env):
                orientation_weight = 1.0,
                direction_weight = 1.0,
                speed_weight = 1.0,
+               mimic_weight = 20.0,
                type_weight = 10,
                distance_limit=float("inf"),
                observation_noise_stdev=0.0,
@@ -140,9 +141,10 @@ class AidaBulletEnv(gym.Env):
     self._direction_weight = direction_weight
     self._direction_weight = direction_weight
     self._speed_weight = speed_weight
-	
+    self._mimic_weight = mimic_weight
     self._rewardLineID = -1
     self._shapeID = -1
+    self._t = 0
 
     #self._env_randomizer = env_randomizer
     # PD control needs smaller time step for stability.
@@ -231,8 +233,8 @@ class AidaBulletEnv(gym.Env):
     pybullet.removeUserDebugItem(self._shapeID)
     self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
     for i in range(50):
-        self._step([-1,-1,1,  0,0,1,  -1,-1,1,  0,0,1])  # init
-        
+        self._step([0.0, -0.85, 0.5, 0.0, -0.85, 0.5, 0, -0.45, 0.5, 0, -0.45, 0.5])  # init
+    self._t = 0
     return ret
 
   def _seed(self, seed=None):
@@ -351,7 +353,7 @@ class AidaBulletEnv(gym.Env):
     local_up = rot_mat[6:]
     pos = self.aida.GetBasePosition()
     return (np.dot(np.asarray([0, 0, 1]), np.asarray(local_up)) < 0.85 or
-            pos[2] < 0.13)
+            pos[2] < 0.13 or self._t > 3000)
     
   def _termination(self):
     position = self.aida.GetBasePosition()
@@ -359,6 +361,7 @@ class AidaBulletEnv(gym.Env):
     return self.is_fallen() or distance > self._distance_limit
 
   def _reward(self):
+    self._t += 1
     current_base_position = self.aida.GetBasePosition()
     distToTarget = self.aida.distToTarget()
     if(np.linalg.norm(distToTarget) < 0.4):
@@ -382,14 +385,25 @@ class AidaBulletEnv(gym.Env):
     dirTo /= np.linalg.norm(dirTo)
     actualDir = rot_mat[:2]
     actualDir /= np.linalg.norm(actualDir)
-    direction_reward = np.exp(-((np.dot(actualDir, dirTo)-1)**2)/0.5)
+    direction_reward = np.exp(-((np.dot(actualDir, -dirTo)-1)**2)/0.5)
     x = np.dot(np.array(self.aida.GetBaseLinearVelocity()[0:2]),dirTo)
     speed_reward = np.arctan(3*x)/np.pi+0.5
 
+    t = self._t
+    speed=0.05
+    offset = np.pi
+    actions_unsync = [np.sin(t * speed + offset-np.pi)*0.3, -0.65+ np.cos(t * speed + offset) *0.2, 0.5]
+    offset = 0
+    actions = [np.sin(t * speed + offset-np.pi)*0.3, -0.65+ np.cos(t * speed + offset) *0.2, 0.5]
+    targetPos = actions_unsync + actions_unsync + actions + actions
+    realPos = self._get_observation()[0:12]
+    
+    diff = np.linalg.norm(np.array(realPos)-np.array(targetPos))
+    rewardDiff = np.exp(-3*diff)
+    
+    reward = self._mimic_weight*rewardDiff + self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
 
-    reward = self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
-
-    reward /=(self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
+    reward /=(self._mimic_weight + self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
     #pybullet.removeUserDebugItem(self._rewardLineID)
     #self._rewardLineID = pybullet.addUserDebugLine([0,0,0],[0,0,reward],lineColorRGB=[0.5,1,0], lineWidth=10)
     
