@@ -136,12 +136,9 @@ if __name__ == '__main__':
 	commands = [[-1,0],[-2,0],[-3,-1],[-3.5,-2],[-3.5,-3],[-3.5,-5],[-2,-6],[0,-7],[2,-6]]
 	for i in range(5):
 		commands += [[commands[-1][0]+np.random.rand(),commands[-1][0]+np.random.rand()]]
-	
-<<<<<<< HEAD
+
 	if(args.algo=="td3" or args.algo == "sac"):
-=======
-	if(args.algo == "sac"):
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+
 		env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 													  render  = False, 
 													  on_rack = False,
@@ -149,26 +146,9 @@ if __name__ == '__main__':
 													  height_weight      = args.height_weight,
 													  orientation_weight = args.orientation_weight,
 													  direction_weight   = args.direction_weight,
-<<<<<<< HEAD
+
 													  speed_weight       = args.speed_weight,
 													  mimic_weight       = args.mimic_weight
-													  )
-							])
-	else:
-		env = SubprocVecEnv([lambda:  e.AidaBulletEnv(commands,
-											  render  = False, 
-											  on_rack = False,
-											  default_reward     = args.default_reward,
-											  height_weight      = args.height_weight,
-											  orientation_weight = args.orientation_weight,
-											  direction_weight   = args.direction_weight,
-											  speed_weight       = args.speed_weight,
-											  mimic_weight       = args.mimic_weight
-											  )
-					for i in range(32)])
-	
-=======
-													  speed_weight       = args.speed_weight
 													  )
 							])
 	elif(args.algo == "ppo2"):
@@ -183,8 +163,7 @@ if __name__ == '__main__':
 												  )
 						for i in range(32)])
 						
-						
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+
 	if normalize:
 		env = VecNormalize(env, gamma=args.gamma)
 
@@ -248,7 +227,7 @@ if __name__ == '__main__':
 			policy_kwargs   = dict(layers=args.layers),
 			tensorboard_log = workDirectory+"/log"
 			)
-<<<<<<< HEAD
+
 	elif(args.algo=="td3"):
 		n_actions = env.action_space.shape[-1]
 		#action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.02 * np.ones(n_actions))
@@ -276,7 +255,7 @@ if __name__ == '__main__':
 		model.test_env = VecNormalize(model.test_env, gamma=args.gamma)
 		
 		
-=======
+
 	
 	model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 													  render  = False, 
@@ -289,7 +268,7 @@ if __name__ == '__main__':
 													  )
 							])
 							
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+
 	def callback(_locals, _globals):
 		"""
 		Callback for monitoring learning progress.
@@ -301,19 +280,12 @@ if __name__ == '__main__':
 
 
 		# Initialize variables
-<<<<<<< HEAD
+
 		if not hasattr(self_, 'started'):
 			self_.started = False
 			self_.last_time_evaluated = 0
 
-		if (self_.num_timesteps - self_.last_time_evaluated) < 10000:
-=======
-		if not hasattr(self_, 'began'):
-			self_.began = True
-			self_.last_time_evaluated = 0
-
-		if (self_.num_timesteps - self_.last_time_evaluated) < 50000:
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+		if (self_.num_timesteps - self_.last_time_evaluated) < 20000:
 			return True
 
 		self_.last_time_evaluated = self_.num_timesteps
@@ -322,7 +294,7 @@ if __name__ == '__main__':
 		rewards = []
 		n_steps_done, reward_sum = 0, 0.0
 
-<<<<<<< HEAD
+
 		# Sync the obs rms if using vecnormalize
 		# NOTE: this does not cover all the possible cases
 		if isinstance(self_.test_env, VecNormalize):
@@ -330,17 +302,13 @@ if __name__ == '__main__':
 			self_.test_env.ret_rms = deepcopy(self_.env.ret_rms)
 			# Do not normalize reward
 			self_.test_env.norm_reward = False
-=======
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+
 
 		obs = self_.test_env.reset()
 		while n_steps_done < 1500:
 			# Use default value for deterministic
-<<<<<<< HEAD
-			action, _ = self_.predict(obs,)
-=======
+
 			action, _ = self_.predict(obs, deterministic = True)
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
 			obs, reward, done, _ = self_.test_env.step(action)
 			reward_sum += reward
 			n_steps_done += 1
@@ -349,28 +317,20 @@ if __name__ == '__main__':
 				rewards.append(reward_sum)
 				reward_sum = 0.0
 				obs = self_.test_env.reset()
-<<<<<<< HEAD
 				n_steps_done = 1500
 				
-=======
 				break
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
 		rewards.append(reward_sum)
 		mean_reward = np.mean(rewards)
 		summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
 		_locals['writer'].add_summary(summary, self_.num_timesteps)
-<<<<<<< HEAD
 		self_.last_mean_test_reward = mean_reward
 		return True
-		
-		
-=======
 
-		return True	
 	
  
 			
->>>>>>> eeda6f865f5dfac808e15b376651ed434cd31f25
+
 	for i in range(args.total_steps//args.save_every):
 		model.learn(total_timesteps=args.save_every, tb_log_name=model_name, reset_num_timesteps=False, callback=callback)
 		if normalize:
