@@ -50,6 +50,8 @@ class AidaBulletEnv(gym.Env):
                speed_weight = 1.0,
                mimic_weight = 20.0,
                type_weight = 10,
+               consistancy_weight = 5,
+               logReward = False,
                distance_limit=float("inf"),
                observation_noise_stdev=0.0,
                self_collision_enabled=True,
@@ -139,13 +141,25 @@ class AidaBulletEnv(gym.Env):
     self._currentObjective = 0
     self._orientation_weight = orientation_weight
     self._direction_weight = direction_weight
-    self._direction_weight = direction_weight
     self._speed_weight = speed_weight
     self._mimic_weight = mimic_weight
+    self._consistancy_weight = consistancy_weight
     self._rewardLineID = -1
     self._shapeID = -1
     self._t = 0
-
+    self._last_action = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
+    self._new_action = np.array([0,0,0,0,0,0,0,0,0,0,0,0])
+    self._logRewardTab = []
+    self._logReward = logReward
+    
+    self._height_forgiveness = 0.007
+    self._orientation_forgiveness = 0.005
+    self._speed_forgiveness = 4
+    self._direction_forgiveness = 0.5
+    self._mimic_forgiveness = 3
+    
+    self._ideal_speed = 0.05
+    
     #self._env_randomizer = env_randomizer
     # PD control needs smaller time step for stability.
     if pd_control_enabled or accurate_motor_model_enabled:
@@ -230,11 +244,13 @@ class AidaBulletEnv(gym.Env):
     ret = self._noisy_observation()
     self._currentObjective = 0
     self.aida.setTarget(self._commands[self._currentObjective])
-    pybullet.removeUserDebugItem(self._shapeID)
-    self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
+    if(self._is_render):
+        pybullet.removeUserDebugItem(self._shapeID)
+        self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
     for i in range(50):
         self._step([0.0, -0.85, 0.5, 0.0, -0.85, 0.5, 0, -0.45, 0.5, 0, -0.45, 0.5])  # init
     self._t = 0
+    self._logRewardTab = []
     return ret
 
   def _seed(self, seed=None):
@@ -279,10 +295,15 @@ class AidaBulletEnv(gym.Env):
     for _ in range(self._action_repeat):
       self.aida.ApplyAction(action)
       self._pybullet_client.stepSimulation()
-
-    self._env_step_counter += 1
+    
+    
+    self._new_action = np.copy(action)
     reward = self._reward()
+    self._last_action = np.copy(self._new_action)
+    self._env_step_counter += 1
+    
     done = self._termination()
+    
     return np.array(self._noisy_observation()), reward, done, {}
 
   def _render(self, mode="rgb_array", close=False):
@@ -368,49 +389,66 @@ class AidaBulletEnv(gym.Env):
         self._currentObjective = (self._currentObjective+1)%len(self._commands)
 
         self.aida.setTarget(self._commands[self._currentObjective])
-        pybullet.removeUserDebugItem(self._shapeID)
-        self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
+        if(self._is_render):
+            pybullet.removeUserDebugItem(self._shapeID)
+            self._shapeID = pybullet.addUserDebugLine(self._commands[self._currentObjective]+[0],self._commands[self._currentObjective]+[1],lineColorRGB=[0,1,0.5], lineWidth=10)
         #if(self._is_render):
             #self.drawTarget(self.aida._targetPoint)
     
-
-    height_reward = np.exp(-((current_base_position[2]-0.7)**2)/0.15)
+    
+    height_reward = np.exp(-((current_base_position[2]-0.7)**2)/self._height_forgiveness)
     
     orientation = self.aida.GetBaseOrientation()
     rot_mat = self._pybullet_client.getMatrixFromQuaternion(orientation)
     local_up = rot_mat[6:]
-    orientation_reward = np.exp(-((np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-1)**2)/0.005)
+    orientation_reward = np.exp(-((np.dot(np.asarray([0, 0, 1]), np.asarray(local_up))-1)**2)/self._orientation_forgiveness)
     
     dirTo = distToTarget 
     dirTo /= np.linalg.norm(dirTo)
     actualDir = rot_mat[:2]
     actualDir /= np.linalg.norm(actualDir)
-    direction_reward = np.exp(-((np.dot(actualDir, -dirTo)-1)**2)/0.5)
+    direction_reward = np.exp(-((np.dot(actualDir, -dirTo)-1)**2)/self._direction_forgiveness)
     x = np.dot(np.array(self.aida.GetBaseLinearVelocity()[0:2]),dirTo)
-    speed_reward = np.arctan(3*x)/np.pi+0.5
+    speed_reward = np.arctan(self._speed_forgiveness*x)/np.pi*2
 
     t = self._t
-    speed=0.05
+    speed=self._ideal_speed
     offset = np.pi
     actions_unsync = [np.sin(t * speed + offset-np.pi)*0.3, -0.65+ np.cos(t * speed + offset) *0.2, 0.5]
     offset = 0
-    actions = [np.sin(t * speed + offset-np.pi)*0.3, -0.65+ np.cos(t * speed + offset) *0.2, 0.5]
+    actions = [np.sin(t * speed + offset-np.pi)*0.4, -0.75+ np.cos(t * speed + offset) *0.2, 0.5]
     targetPos = actions_unsync + actions_unsync + actions + actions
     realPos = self._get_observation()[0:12]
     
     diff = np.linalg.norm(np.array(realPos)-np.array(targetPos))
-    rewardDiff = np.exp(-3*diff)
-    
-    reward = self._mimic_weight*rewardDiff + self._default_reward + self._height_weight*height_reward + self._orientation_weight*orientation_reward + self._direction_weight*direction_reward + self._speed_weight*speed_reward
+    #rewardDiff = np.exp(-self._mimic_forgiveness*diff)
+    #rewardDiff = 1-diff/self._mimic_forgiveness
+    rewardDiff = (1-np.power((diff/2),0.4))*self._mimic_forgiveness
+    rewardDivider = self._mimic_weight +self._height_weight+self._orientation_weight+self._direction_weight+self._speed_weight
+			   
+    reward =( self._mimic_weight/rewardDivider*       rewardDiff + 
+              self._height_weight/rewardDivider*      height_reward + 
+              self._orientation_weight/rewardDivider* orientation_reward + 
+              self._direction_weight/rewardDivider*   direction_reward + 
+              self._speed_weight/rewardDivider*       speed_reward)
 
-    reward /=(self._mimic_weight + self._default_reward+self._height_weight+self._orientation_weight+self._orientation_weight+self._direction_weight+self._speed_weight)
+    if(self._termination()):
+	    reward = -10
     #pybullet.removeUserDebugItem(self._rewardLineID)
     #self._rewardLineID = pybullet.addUserDebugLine([0,0,0],[0,0,reward],lineColorRGB=[0.5,1,0], lineWidth=10)
-    
+    self._logRewardTab+=[[height_reward,orientation_reward,direction_reward,speed_reward,rewardDiff,reward]]
+   
     return reward
 
+  def _get_rewardLog(self):
+      return np.mean(self._logRewardTab, axis=0)
 
-
+  def _get_LastrewardLog(self):
+      return self._logRewardTab[-1]
+  
+  def _get_rewardLogNames(self):
+    return ["height_reward","orientation_reward","direction_reward","speed_reward","mimic_reward","reward"]
+  
   def _get_observation(self):
     self._observation = self.aida.GetObservation()
     return self._observation
@@ -425,3 +463,22 @@ class AidaBulletEnv(gym.Env):
                       self.aida.GetObservationUpperBound())
 
     return observation
+
+  def _send_config(self):
+
+    names = ["_height_forgiveness","_height_weight",
+    "_orientation_forgiveness","_orientation_weight",
+    "_direction_forgiveness","_direction_weight",
+    "_mimic_forgiveness","_mimic_weight",
+    "_speed_forgiveness","_speed_weight","_ideal_speed"]
+    
+    values = [self._height_forgiveness,self._height_weight,
+    self._orientation_forgiveness,self._orientation_weight,
+    self._direction_forgiveness,self._direction_weight,
+    self._mimic_forgiveness,self._mimic_weight,
+    self._speed_forgiveness,self._speed_weight,self._ideal_speed]
+
+    return [names, values]
+        
+
+        

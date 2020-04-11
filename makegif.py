@@ -21,6 +21,9 @@ parser.add_argument('--normalize', type=bool, default=False,
                     help='Normalize the environement for training (default: False)')
 parser.add_argument('--algo', type=str, default="ppo2", 
                     help='Algorithm used to train the model')
+parser.add_argument('--dir', type=str, default=None, 
+                    help='Algorithm used to train the model')					
+					
 args = parser.parse_args()
 name_resume = args.name
 normalize   = args.normalize
@@ -47,9 +50,11 @@ obs = env.reset()
 img = env.render(mode='rgb_array')
 for i in range(15*2*10):
 	images.append(img)
-	action, _ = model.predict(obs)
+	action, _ = model.predict(obs, deterministic=True)
 	obs, _, _ ,_ = env.step(action)
 	img = env.render(mode='rgb_array')
 	print("frame "+str(i) +"/"+str(2*150))
-
-imageio.mimsave(workDirectory+"/resultats/"+name_resume+"/video/"+name_resume+".gif", [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=20)
+if(args.dir == None):
+	imageio.mimsave(workDirectory+"/resultats/"+name_resume+"/video/"+name_resume+".gif", [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=50)
+else:
+    imageio.mimsave(args.dir, [np.array(img) for i, img in enumerate(images) if i%2 == 0], fps=50)

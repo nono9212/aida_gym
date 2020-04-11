@@ -17,6 +17,10 @@ from stable_baselines import TD3
 from stable_baselines.td3.policies import MlpPolicy as MlpPolicyTD3
 from stable_baselines.ddpg.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise
 
+import sqlite3
+
+
+
 if __name__ == '__main__':
 
 	workDirectory = "."
@@ -76,7 +80,10 @@ if __name__ == '__main__':
 					help='Multiplicator of the speed reward (default: 0.0)')	
 	parser.add_argument('--mimic_weight', default=20.0, type=float,
 					help='Multiplicator of the speed reward (default: 0.0)')
-					
+			
+	parser.add_argument('--consistancy_weight', default=10.0, type=float,
+					help='Multiplicator of the speed reward (default: 0.0)')
+			
 	parser.add_argument('--batch_size', default=64, type=int,
 					help=' (int) Minibatch size for each gradient update (default: 64)')	
 	parser.add_argument('--buffer_size', default=50000, type=int,
@@ -128,6 +135,10 @@ if __name__ == '__main__':
 		os.mkdir(workDirectory+"/log")
 	except FileExistsError:
 		print("Directory already exists")
+	try:
+		os.mkdir("./server/assets/video/"+model_name)
+	except FileExistsError:
+		print("Directory already exists")
 		
 		
 	with open(workDirectory+"/resultats/"+model_name+'/data.txt', 'w') as outfile:
@@ -148,7 +159,8 @@ if __name__ == '__main__':
 													  direction_weight   = args.direction_weight,
 
 													  speed_weight       = args.speed_weight,
-													  mimic_weight       = args.mimic_weight
+													  mimic_weight       = args.mimic_weight,
+													  consistancy_weight = args.consistancy_weight
 													  )
 							])
 	elif(args.algo == "ppo2"):
@@ -159,7 +171,8 @@ if __name__ == '__main__':
 												  height_weight      = args.height_weight,
 												  orientation_weight = args.orientation_weight,
 												  direction_weight   = args.direction_weight,
-												  speed_weight       = args.speed_weight
+												  speed_weight       = args.speed_weight,
+												  consistancy_weight = args.consistancy_weight
 												  )
 						for i in range(32)])
 						
@@ -241,33 +254,23 @@ if __name__ == '__main__':
 				)
 
 	model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-											  render  = False, 
-											  on_rack = False,
-											  default_reward     = args.default_reward,
-											  height_weight      = args.height_weight,
-											  orientation_weight = args.orientation_weight,
-											  direction_weight   = args.direction_weight,
-											  speed_weight       = args.speed_weight,
-											  mimic_weight       = args.mimic_weight
-											  )
-					])
-	if normalize:
-		model.test_env = VecNormalize(model.test_env, gamma=args.gamma)
-		
-		
-
-	
-	model.test_env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
 													  render  = False, 
 													  on_rack = False,
 													  default_reward     = args.default_reward,
 													  height_weight      = args.height_weight,
 													  orientation_weight = args.orientation_weight,
 													  direction_weight   = args.direction_weight,
-													  speed_weight       = args.speed_weight
+
+													  speed_weight       = args.speed_weight,
+													  mimic_weight       = args.mimic_weight,
+													  consistancy_weight = args.consistancy_weight,
+													  logReward = True
 													  )
 							])
-							
+	if normalize:
+		model.test_env = VecNormalize(model.test_env, gamma=args.gamma)
+	
+					
 
 	def callback(_locals, _globals):
 		"""
@@ -287,8 +290,27 @@ if __name__ == '__main__':
 
 		if (self_.num_timesteps - self_.last_time_evaluated) < 20000:
 			return True
+			
+
+		
+		
+		sql = ''' SELECT id, type, value FROM parameters WHERE simu="'''+self_.dbName+'''" AND step=-1 '''
+		conn = sqlite3.connect("./server/database.db")		
+		cur = conn.cursor()
+		cur.execute(sql)
+		dff = list(cur.fetchall())
+		for d in dff:
+		   self_.env.set_attr(d[1],d[2],indices=range(32))
+		   self_.test_env.set_attr(d[1],d[2],indices=range(1))
+		cur.execute("UPDATE parameters SET step={0} WHERE step=-1 AND simu='{1}'".format(self_.num_timesteps,self_.dbName))
+		conn.commit()
+		cur.close()
+		conn.close()
 
 		self_.last_time_evaluated = self_.num_timesteps
+		
+
+
 
 		# Evaluate the trained agent on the test env
 		rewards = []
@@ -305,6 +327,7 @@ if __name__ == '__main__':
 
 
 		obs = self_.test_env.reset()
+		rewardLog = []
 		while n_steps_done < 1500:
 			# Use default value for deterministic
 
@@ -312,47 +335,73 @@ if __name__ == '__main__':
 			obs, reward, done, _ = self_.test_env.step(action)
 			reward_sum += reward
 			n_steps_done += 1
-
+			if(not(done)):
+				rewardLog+=[self_.test_env.env_method("_get_LastrewardLog")[0]]
 			if done:
 				rewards.append(reward_sum)
 				reward_sum = 0.0
-				obs = self_.test_env.reset()
 				n_steps_done = 1500
 				
 				break
 		rewards.append(reward_sum)
 		mean_reward = np.mean(rewards)
 		summary = tf.Summary(value=[tf.Summary.Value(tag='evaluation', simple_value=mean_reward)])
+		data = np.mean(rewardLog, axis=0)
+		names = self_.test_env.env_method("_get_rewardLogNames")[0]
+		sql = ''' INSERT INTO output(simu, type, step, value)
+              VALUES(?,?,?,?) '''
+		val = (self_.dbName, "total_reward", self_.num_timesteps , float(mean_reward))
+		conn = sqlite3.connect("./server/database.db")		
+		cur = conn.cursor()
+		cur.execute(sql,val)
+		for i in range(len(data)):
+		   val = (self_.dbName, names[i], self_.num_timesteps , float(data[i]))
+		   cur.execute(sql,val)
+		conn.commit()
+		cur.close()
+		conn.close()
 		_locals['writer'].add_summary(summary, self_.num_timesteps)
 		self_.last_mean_test_reward = mean_reward
 		return True
-
-	
- 
 			
-
+	model.dbName = model_name
+	conn = sqlite3.connect("./server/database.db")        
+	cur = conn.cursor()
+	val = model.env.env_method("_send_config")[0]
+	names, values= val[0],val[1]
+	for i in range(len(values)):
+		sql = ''' INSERT INTO parameters(simu, type, step, value)
+			VALUES(?,?,?,?) '''
+		val = (model_name, names[i], 0, float(values[i]))
+		cur.execute(sql,val)
+		conn.commit()
+	cur.close()
+	conn.close()
+	
+	
 	for i in range(args.total_steps//args.save_every):
 		model.learn(total_timesteps=args.save_every, tb_log_name=model_name, reset_num_timesteps=False, callback=callback)
 		if normalize:
 			env.save_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 		model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)
-	
+		os.system("python3 makegif.py --algo "+args.algo+" --dir ./server/assets/"+model_name+"_"+str((i+1)*args.save_every)+"_steps.gif --name "+model_name)
 		print("\n saved at "+str((i+1)*args.save_every))
 	model.save(workDirectory+"/resultats/"+model_name+"/"+model_name)	
 	if normalize:
 		env.save_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
 	env = DummyVecEnv([lambda:  e.AidaBulletEnv(commands,
-											  render  = False, 
-											  on_rack = False,
-												 
-											  default_reward     = args.default_reward,
-											  height_weight      = args.height_weight,
-											  orientation_weight = args.orientation_weight,
-											  direction_weight   = args.direction_weight,
-											  speed_weight       = args.speed_weight,
-											  mimic_weight       = args.mimic_weight
-											  )
-					])
+													  render  = False, 
+													  on_rack = False,
+													  default_reward     = args.default_reward,
+													  height_weight      = args.height_weight,
+													  orientation_weight = args.orientation_weight,
+													  direction_weight   = args.direction_weight,
+
+													  speed_weight       = args.speed_weight,
+													  mimic_weight       = args.mimic_weight,
+													  consistancy_weight = args.consistancy_weight
+													  )
+							])
 	if normalize:
 		env = VecNormalize(env, gamma=args.gamma, training = False)
 		env.load_running_average(workDirectory+"/resultats/"+model_name+"/normalizeData")
