@@ -66,7 +66,8 @@ class AidaBulletEnv(gym.Env):
                hard_reset=True,
                on_rack=False,
                render=False,
-               kd_for_pd_controllers=0.3):
+               kd_for_pd_controllers=0.3, 
+	       duck=False):
                #env_randomizer=aida_env_randomizer.aidaEnvRandomizer()):
     """Initialize aida gym environment.
     Args:
@@ -114,6 +115,7 @@ class AidaBulletEnv(gym.Env):
     self._observation = []
     self._env_step_counter = 0
     self._is_render = render
+    self._duck = duck
     self._last_base_position = [0, 0, 0]
     self._height_weight = height_weight
     self._type_weight = type_weight
@@ -186,6 +188,7 @@ class AidaBulletEnv(gym.Env):
     self.viewer = None
     self._hard_reset = hard_reset  # This assignment need to be after reset()
     self.render = self._render
+    self.duck = self._duck
     self.step = self._step
 
  # def set_env_randomizer(self, env_randomizer):
@@ -280,6 +283,30 @@ class AidaBulletEnv(gym.Env):
       ValueError: The action dimension is not the same as the number of motors.
       ValueError: The magnitude of actions is out of bounds.
     """
+    if(np.random.random_sample() > 0.99 and self._duck == True):
+        position = self.aida.GetBasePosition()
+        shift = [0, -0.02, 0]
+        size=random.uniform(0.015, 0.04)
+        mass=random.uniform(5, 20)
+        meshScale = [size, size, size]
+        #the visual shape and collision shape can be re-used by all createMultiBody instances (instancing)
+        visualShapeId = pybullet.createVisualShape(shapeType=pybullet.GEOM_MESH,
+                                    fileName="duck.obj",
+                                    rgbaColor=[1, 1, 1, 1],
+                                    specularColor=[0.4, .4, 0],
+                                    visualFramePosition=shift,
+                                    meshScale=meshScale)
+        collisionShapeId = pybullet.createCollisionShape(shapeType=pybullet.GEOM_MESH,
+                                          fileName="duck.obj",
+                                          collisionFramePosition=shift,
+                                          meshScale=meshScale)
+        pybullet.createMultiBody(baseMass=mass,
+                      baseInertialFramePosition=[0, 0, 0],
+                      baseCollisionShapeIndex=collisionShapeId,
+                      baseVisualShapeIndex=visualShapeId,
+                      basePosition=[position[0],
+                                    position[1], position[2]+1],
+                      useMaximalCoordinates=True)
     if self._is_render:
       # Sleep, otherwise the computation takes less time than real time,
       # which will make the visualization like a fast-forward video.
