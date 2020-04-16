@@ -38,6 +38,8 @@ python3 train.py --name NAME --algo ppo2
 ```
 This will launch a training sessions, their are plenty of options you can use, type `python3 train.py --help` to kown more about them. Here we wrote the requiered ones : a name and the algorithm used (choose between ppo2, sac, and a2c). It is really easy to add more if you will.
 
+The directories are set up so that each script knows were to look. The folder resultat contains the zip of the saved models and a gif created at the end of the simulation (more gifs can be found in server/assets) but you can also make your one gifs (see monitoring section)
+
 ### Monitoring
 
 Using tensorboard (still in aida_gym folder):
@@ -51,6 +53,12 @@ Using our custom made monitoring server (which will display GIFs and let you aju
 python3 app2.py
 ```
 It will launch a server on port 8050.
+
+To create your own gif of a saved model you can type (in aida_gym folder) :
+``` Python
+python3 makegif.py --name NAME
+```
+Since the directories are well made, you don't need to specify the location of the zip model, it will know were to look just using the name. The gif is saved in the video folder of the model.
 
 ### Optimizing
 
