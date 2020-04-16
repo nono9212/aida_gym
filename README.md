@@ -59,3 +59,8 @@ In order to optimize the hyperparameters, you can use the opti.py scripts :
 python3 optiPPO2.py
 ```
 This will launch a series of simulations with different hyperparameters, log them into tensorboard (lodgir ./optimisation/logOPTI). You can also gather the results from the sqlite database that is created in order to visualize them on Excel. This optimisation uses Optuna, features TPE sampler and Median pruning.
+
+## Note on using distant computer
+
+You can of course launch all those commands via SSH and get the resulting files using FTP on a distant computer. The idea is to free your personnal computer from heavy computation while you need it for your daily activities.
+A great tip is to create a [SSH tunnel](https://www.abyssproject.net/2015/05/tunnel-ssh-et-port-forwarding-avec-putty-sous-windows/) in order to access the servers, for example you can map your localhost:8001 port to the distant localhost:8050 in order to access the monitoring server from a different network.
